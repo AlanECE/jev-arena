@@ -22,3 +22,6 @@ ARENA_DEV.md
 # SF Pro Display : licence Apple, non redistribuable (voir arena/app/static/common/fonts/LISEZMOI.md)
 *.OTF
 *.otf
+
+# exports de leads (donnees personnelles : jamais dans le depot)
+/exports/
