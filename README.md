@@ -16,7 +16,7 @@ pour de vrai sur OpenRouter et son coût réel s'affiche.
 Il te faut [Docker Desktop](https://www.docker.com/products/docker-desktop/) et une clé OpenRouter.
 
 ```bash
-git clone <ce dépôt> jev-arena
+git clone https://github.com/AlanECE/jev-arena.git
 cd jev-arena
 cp .env.example .env        # puis ouvre .env et colle ta clé OPENROUTER_API_KEY
 docker compose up -d --build
