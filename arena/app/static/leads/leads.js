@@ -373,11 +373,12 @@
           ${col("opus", O)}
         </div>
         <div class="fdis"><div class="label">Désaccords sur le verdict (${dis.length})</div>${disHTML}</div>
-        <div class="factions"><button class="btn ghost" data-act="close" type="button">Voir les leads</button><button class="btn violet" data-act="new" type="button">Nouvelle course (R)</button></div>
+        <div class="factions"><button class="btn ghost" data-act="xls" type="button">Leads en Excel</button><button class="btn ghost" data-act="close" type="button">Voir les leads</button><button class="btn violet" data-act="new" type="button">Nouvelle course (R)</button></div>
         <div class="ffoot">Source : ${Arena.num(sm.pipe.profiles)} profils GitHub lus par Scout, ${Arena.num(sm.pipe.fetch.pages)} pages lues (Lightpanda ${sm.pipe.fetch.lightpanda}, Crawl4AI ${sm.pipe.fetch.crawl4ai}, échecs ${sm.pipe.fetch.fail}). Emails ${S.mask ? "masqués" : "visibles"}, personne n'a été contacté.</div>
       </div>`;
     box.querySelector('[data-act="new"]').onclick = () => newRace();
     box.querySelector('[data-act="close"]').onclick = () => { S.showFinal = false; renderFinal(); };
+    box.querySelector('[data-act="xls"]').onclick = (ev) => LeadsExport.download(ev.currentTarget);
     box.hidden = false;
     requestAnimationFrame(() => requestAnimationFrame(() => box.classList.add("show")));
   }
@@ -406,17 +407,18 @@
   }
 
   function onEvent(e) {
+    LeadsExport.onEvent(e);   // l'export Excel garde toute la course (la page n'affiche que les dernieres lignes)
     switch (e.type) {
-      case "snapshot": onSnapshot(e.data); break;
+      case "snapshot": onSnapshot(e.data); updateXls(); break;
       case "config": renderConfig(e.config); break;
       case "reset":
-        blank();
+        blank(); updateXls();
         setPhase("idle");
         renderConfig(e.config); S.stats = idleStats(); renderStats();
         break;
       case "race_start":
         blank("Scout cherche les premiers leads…");
-        setPhase("running");
+        setPhase("running"); updateXls();
         S.stats = { ...idleStats(), target: e.target, conc: e.conc }; S.statsAt = performance.now();
         setText($("#conc-txt"), e.conc);
         renderStats();
@@ -433,11 +435,11 @@
       case "agree": markAgree(e.lead, e.agree); break;
       case "web": addFeed(e, true); break;
       case "race_end":
-        setPhase("done"); S.summary = e.summary;
+        setPhase("done"); S.summary = e.summary; updateXls();
         setTimeout(() => { S.showFinal = true; renderFinal(); }, 1400);
         break;
       case "race_error":
-        setPhase("error"); banner("Course arrêtée : " + (e.error || "erreur"));
+        setPhase("error"); banner("Course arrêtée : " + (e.error || "erreur")); updateXls();
         break;
       case "error": Arena.toast(e.error || "erreur"); break;
     }
@@ -461,6 +463,9 @@
     ws.send({ cmd: "start", target: S.config.target, conc: S.config.conc });
   }
   function newRace() { ws.send({ cmd: "reset" }); }
+  // bouton « Leads en Excel » : visible quand une course est finie (pas pendant la course, pour la vidéo)
+  function updateXls() { $("#btn-xls").hidden = S.phase === "running" || !LeadsExport.hasData(); }
+  $("#btn-xls").addEventListener("click", (e) => { e.currentTarget.blur(); LeadsExport.download(e.currentTarget); });
   $("#btn-start").addEventListener("click", (e) => { e.currentTarget.blur(); start(); });
   $("#btn-new").addEventListener("click", (e) => { e.currentTarget.blur(); newRace(); });
   document.addEventListener("keydown", (ev) => {
@@ -470,6 +475,7 @@
     else if (ev.key === "m" || ev.key === "M") toggleMask();
     else if (ev.key === "f" || ev.key === "F") { if (S.summary) { S.showFinal = !S.showFinal; renderFinal(); } }
     else if (ev.key === "Escape") { S.showFinal = false; renderFinal(); }
+    else if ((ev.key === "e" || ev.key === "E") && S.phase !== "running") LeadsExport.download($("#btn-xls"));
   });
   function toggleMask() {
     S.mask = !S.mask;

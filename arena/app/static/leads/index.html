@@ -18,6 +18,7 @@
   </div>
   <button class="btn violet go" id="btn-start" type="button">Lancer la course</button>
   <button class="btn ghost again" id="btn-new" type="button" hidden>Nouvelle course</button>
+  <button class="btn ghost xls" id="btn-xls" type="button" hidden>Leads en Excel</button>
   <span class="chip" id="phase">prêt</span>
   <span class="chip mask-chip" id="mask-chip">masqué</span>
   <span class="conn" id="conn">connexion…</span>
@@ -134,9 +135,11 @@
 
 <div class="final" id="final" hidden></div>
 <div class="banner" id="banner" hidden></div>
-<div class="keys" id="keys">Espace : lancer · R : nouvelle course · M : démasquer · F : bilan</div>
+<div class="keys" id="keys">Espace : lancer · R : nouvelle course · M : démasquer · F : bilan · E : leads en Excel</div>
 
+<script src="/static/vendor/exceljs.min.js"></script>
 <script src="/static/common/arena.js"></script>
+<script src="/static/common/leads_export.js"></script>
 <script src="/static/leads/leads.js"></script>
 </body>
 </html>
