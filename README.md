@@ -67,8 +67,8 @@ COMPOSE_PROFILES=laya-cpu
 ```
 
 Puis relance `docker compose up -d --build`. Le premier démarrage est long : l'image GPU pèse environ 9 Go (l'image
-CPU est bien plus légère), et Laya télécharge ensuite ses modèles (environ 2,3 Go), une seule fois. Sur le processeur,
-chaque décision est plus lente que sur la carte graphique.
+CPU environ 1,5 Go), et Laya télécharge ensuite ses modèles (environ 2,3 Go), une seule fois. Laya est léger : même
+sur le processeur d'un PC de bureau, une décision prend quelques centièmes de seconde (la première est plus lente).
 
 Tu peux changer de Laya à tout moment sur la page **http://127.0.0.1:8810/laya** (sauf pendant une course) : elle
 envoie la même décision à Laya local, à la démo Hugging Face et à Jev, et compare la latence et les réponses.
