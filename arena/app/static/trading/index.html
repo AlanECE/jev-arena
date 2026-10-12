@@ -1,0 +1,98 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Scalping en direct · Jev Arena</title>
+<link rel="icon" href="/static/common/logos/typesafe-icon.png">
+<link rel="stylesheet" href="/static/common/arena.css">
+<link rel="stylesheet" href="/static/trading/trading.css">
+<script src="/static/vendor/lightweight-charts.standalone.production.js"></script>
+<script src="/static/common/arena.js"></script>
+</head>
+<body>
+<header class="topbar">
+  <div class="title">Scalping en direct</div>
+  <div class="sym"><span id="symbol">BTC/USD</span> <b id="price" class="num">–</b></div>
+  <div class="chips hidden" id="infoChips">
+    <span class="chip" id="barChip">bougies 1 s</span>
+    <span class="chip" id="srcChip">prix Coinbase · ordres simulés</span>
+    <span class="chip" id="stratChip">stratégie –</span>
+  </div>
+  <div class="spacer"></div>
+  <div class="controls" id="controls">
+    <select id="cPreset" title="préréglage">
+      <option value="">préréglage…</option>
+      <option value="btc-sim">BTC · simulé · 24 h/24</option>
+      <option value="tsla-alpaca">TSLA · Alpaca · séance US</option>
+      <option value="btc-alpaca">BTC · Alpaca · 0,25 %/ordre</option>
+    </select>
+    <select id="cSource"></select>
+    <input id="cSymbol" list="symList" size="6" value="BTC/USD">
+    <datalist id="symList"><option value="TSLA"><option value="QQQ"><option value="SPY"><option value="NVDA"><option value="AAPL"><option value="BTC/USD"></datalist>
+    <select id="cBar"><option value="1">1 s</option><option value="5">5 s</option><option value="15">15 s</option><option value="30">30 s</option></select>
+    <select id="cStrategy"></select>
+    <select id="cBroker" title="exécution des ordres"><option value="sim">courtier simulé</option><option value="alpaca">Alpaca paper</option></select>
+    <select id="cThr" title="seuil d'entrée"><option value="2.0">2,0 σ</option><option value="2.5">2,5 σ</option><option value="3.0">3,0 σ</option></select>
+    <select id="cFee" title="frais par ordre (points de base)"><option value="0">frais 0</option><option value="1">frais 1 pb</option><option value="5">frais 5 pb</option><option value="25">frais 25 pb</option></select>
+    <select id="cDuration"><option value="3">3 min</option><option value="5">5 min</option><option value="10" selected>10 min</option><option value="20">20 min</option><option value="30">30 min</option><option value="0">illimité</option></select>
+    <select id="cSize"><option value="10000">10 000 $</option><option value="25000">25 000 $</option><option value="50000">50 000 $</option><option value="100000" selected>100 000 $</option></select>
+  </div>
+  <span class="chip live hidden" id="liveChip">EN DIRECT</span>
+  <b class="clock num" id="clock">0:00</b>
+  <button class="btn violet" id="btnStart">Lancer le test</button>
+  <a class="home" href="/">accueil</a>
+</header>
+
+<div class="banner hidden" id="banner"></div>
+
+<main class="duel">
+  <section class="fund card jev" id="fund-jev"></section>
+  <section class="fund card opus" id="fund-opus"></section>
+</main>
+
+<div class="overlay card" id="overlay">
+  <div class="duo"><img src="/static/common/logos/typesafe-icon.png" alt=""><span>contre</span><img src="/static/common/logos/claude.png" alt=""></div>
+  <h2>Scalping en direct · <span class="jev">Jev</span> contre <span class="opus">Claude Opus 5.5</span></h2>
+  <p id="ovText">Même stratégie, mêmes données, même compte Alpaca paper. À chaque bougie d'une seconde, chaque modèle décide d'entrer long, short ou de rester à plat. Les sorties sont mécaniques et identiques.</p>
+  <button class="btn violet big" id="btnStartBig">Lancer le test</button>
+  <div class="hint"><span id="ovStatus">connexion…</span> · ou <kbd>Espace</kbd> · <kbd>H</kbd> réglages</div>
+</div>
+
+<div class="final card hidden" id="final"></div>
+<div class="footer" id="footer"></div>
+
+<template id="fundTpl">
+  <div class="fhead">
+    <div class="model-head"><img alt=""><div><div class="name"></div><div class="maker"></div></div></div>
+    <div class="badge flat pos-badge">À PLAT</div>
+    <div class="pnl"><div class="label">Gain net</div><div class="value num">0,00 $</div></div>
+  </div>
+  <div class="drow">
+    <div class="dstate"><span class="dot"></span><span class="dtext">en attente du départ</span></div>
+    <div class="dlast"></div>
+  </div>
+  <div class="plan hidden"><span class="plan-side"></span><span class="plan-count num"></span><span class="plan-levels"></span><span class="plan-pnl num"></span></div>
+  <div class="chart"></div>
+  <div class="tape-wrap"><div class="tape-label">Décision à chaque bougie</div><div class="tape"></div>
+    <div class="legend"><i class="l-long"></i>long <i class="l-short"></i>short <i class="l-flat"></i>à plat <i class="l-think"></i>réfléchit <i class="l-missed"></i>bougie ratée <i class="l-hold"></i>position tenue
+      <span class="sep"></span><i class="l-ema"></i>EMA 20 <i class="l-vwap"></i>VWAP <i class="l-band"></i>seuils d'entrée <i class="l-vol"></i>volume <i class="l-stretch"></i>étirement (σ)<span class="l-alpaca-wrap"><i class="l-alpaca"></i>prix Alpaca</span></div></div>
+  <div class="grid">
+    <div class="stat"><div class="label">Décisions</div><div class="value num s-dec">0</div></div>
+    <div class="stat"><div class="label">Par minute</div><div class="value num s-pm">0</div></div>
+    <div class="stat"><div class="label">Bougies ratées</div><div class="value num s-missed">0</div></div>
+    <div class="stat"><div class="label">Latence médiane</div><div class="value num s-lat">–</div></div>
+    <div class="stat"><div class="label">Coût API</div><div class="value num s-cost">0 $</div></div>
+    <div class="stat"><div class="label">Trades</div><div class="value num s-trades">0</div></div>
+    <div class="stat"><div class="label">Gagnants</div><div class="value num s-wins">–</div></div>
+    <div class="stat"><div class="label">Réalisé</div><div class="value num s-real">0,00 $</div></div>
+    <div class="stat"><div class="label">Frais estimés</div><div class="value num s-fees">0,00 $</div></div>
+    <div class="stat"><div class="label">Ordres</div><div class="value num s-orders">0</div></div>
+  </div>
+  <div class="trades"><div class="tlabel">Derniers trades fermés</div><div class="tlist"></div></div>
+  <div class="otoast"></div>
+</template>
+
+<script src="/static/trading/trading.js"></script>
+</body>
+</html>

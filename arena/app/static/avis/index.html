@@ -1,0 +1,92 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Le tri en direct · Jev Arena</title>
+<link rel="stylesheet" href="/static/common/arena.css">
+<link rel="stylesheet" href="/static/avis/avis.css">
+</head>
+<body>
+<div id="stage">
+  <header class="topbar">
+    <div>
+      <div class="k">04 · Avis clients</div>
+      <div class="title">Le tri en direct</div>
+    </div>
+    <div class="src" id="src"></div>
+    <span class="chip phase-chip" id="phase">prêt</span>
+    <div class="spacer"></div>
+    <div class="ctrls" id="ctrls">
+      <select id="selPreset" title="Source et marque"></select>
+      <select id="selTarget" title="Nombre d'avis"></select>
+      <select id="selConc" title="Avis lus en parallèle (identique pour les deux)"></select>
+      <button class="btn ghost" id="btnLoad" data-act="load" title="Récupérer les avis sans lancer la course">Charger les avis <kbd>C</kbd></button>
+      <button class="btn violet" id="btnStart" data-act="start" title="Récupère les avis si besoin, puis lance la course">Lancer la course <kbd>Espace</kbd></button>
+    </div>
+    <div class="budget" id="raceCost">coût de cette course<br><b id="raceCostV">0,00 $</b></div>
+    <div class="clock" id="clock">0:00</div>
+  </header>
+
+  <main>
+    <section class="side jev card" id="side-jev"></section>
+
+    <section class="center">
+      <div class="chead">
+        <div class="t" id="cTitle">Les avis</div>
+        <div class="sub" id="cSub"></div>
+        <div class="dist" id="dist"></div>
+      </div>
+      <div class="stream" id="stream">
+        <div class="track" id="track"></div>
+        <div class="fetchlog" id="fetchlog"></div>
+        <div class="intro" id="intro"></div>
+      </div>
+    </section>
+
+    <section class="side opus card" id="side-opus"></section>
+  </main>
+
+  <div class="final" id="final"><div class="box card" id="finalBox"></div></div>
+  <div class="errbar" id="errbar"></div>
+  <div class="conn" id="conn" style="position:absolute;left:24px;bottom:4px;font-size:11px"></div>
+</div>
+
+<template id="tplSide">
+  <div class="head">
+    <img class="logo" alt="">
+    <div><div class="name"></div><div class="maker"></div></div>
+    <div class="spacer"></div>
+    <div class="status">en attente</div>
+  </div>
+  <div class="prog">
+    <div class="big" data-k="done">0</div>
+    <div class="of" data-k="of">/ 0</div>
+    <div class="lbl">avis triés<small data-k="inflight">0 en cours</small></div>
+    <div class="time"><div class="v" data-k="time">0,0 s</div><div class="l">chrono</div></div>
+  </div>
+  <div class="progress"><i></i></div>
+  <div class="kpis">
+    <div class="kpi acc"><div class="l">Note exacte</div><div class="v" data-k="exact">–</div></div>
+    <div class="kpi acc"><div class="l">À une étoile près</div><div class="v" data-k="w1">–</div></div>
+    <div class="kpi"><div class="l">Débit</div><div class="v" data-k="rps">–</div></div>
+    <div class="kpi"><div class="l">Latence médiane</div><div class="v"><span data-k="lat">–</span><small data-k="last"></small></div></div>
+    <div class="kpi"><div class="l">Coût réel</div><div class="v" data-k="cost">$0</div></div>
+    <div class="kpi err"><div class="l">Erreurs</div><div class="v" data-k="err">0</div></div>
+  </div>
+  <div class="cols-head">
+    <span class="t">Note devinée</span>
+    <div class="legend"><span><i style="background:var(--exact)"></i>exacte</span><span><i style="background:var(--near)"></i>à 1 ★</span><span><i style="background:var(--off)"></i>fausse</span><span style="color:var(--ink-3)">┅ vraie répartition</span></div>
+  </div>
+  <div class="cols"></div>
+  <div class="topics-head">
+    <span class="t">Sujets</span>
+    <div class="flag"><span>Risque de départ <b data-k="churn">0</b></span><span>Réponse urgente <b data-k="urgent">0</b></span></div>
+  </div>
+  <div class="topics"></div>
+</template>
+
+<script src="/static/common/arena.js"></script>
+<script src="/static/avis/avis.js"></script>
+</body>
+</html>

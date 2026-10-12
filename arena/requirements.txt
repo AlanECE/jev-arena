@@ -1,0 +1,13 @@
+fastapi==0.115.6
+uvicorn[standard]==0.34.0
+httpx==0.28.1
+websockets==14.1
+pydantic==2.10.4
+# Scout (kiryano/Scout) et ses scrapers
+requests>=2.28.0
+dnspython>=2.4.0
+rich>=13.7.0
+beautifulsoup4==4.12.3
+lxml==5.3.0
+# Scene avis : avis Google Play FR (pur Python, sans compte)
+google-play-scraper==1.2.7

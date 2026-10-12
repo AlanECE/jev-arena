@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Jev Arena</title>
+<link rel="stylesheet" href="/static/common/arena.css">
+<style>
+  body { overflow: auto; }
+  main { max-width: 1240px; margin: 0 auto; padding: 56px 28px; }
+  h1 { font-size: 64px; margin: 0; letter-spacing: -.02em; }
+  h1 .jev { color: var(--jev); } h1 .opus { color: var(--opus); }
+  .sub { color: var(--ink-2); font-size: 22px; margin: 12px 0 40px; }
+  .grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 22px; }
+  a.scene { display: block; padding: 28px; text-decoration: none; color: inherit; transition: transform .2s; }
+  a.scene:hover { transform: translateY(-3px); }
+  a.scene .k { font-size: 14px; color: var(--violet); text-transform: uppercase; letter-spacing: .08em; }
+  a.scene h2 { font-size: 32px; margin: 6px 0 8px; }
+  a.scene p { color: var(--ink-2); margin: 0; font-size: 17px; line-height: 1.45; }
+  .duo { display: flex; gap: 10px; align-items: center; margin-bottom: 30px; }
+  .duo img { width: 56px; height: 56px; border-radius: 14px; }
+  .vs { font-weight: 700; color: var(--ink-3); font-size: 20px; }
+  .status { margin-top: 30px; color: var(--ink-3); font-size: 14px; white-space: pre-wrap; }
+</style>
+</head>
+<body>
+<main>
+  <div class="duo"><img src="/static/common/logos/typesafe-icon.png" alt=""><span class="vs">contre</span><img src="/static/common/logos/claude.png" alt=""></div>
+  <h1><span class="jev">Jev</span> contre <span class="opus">Claude Opus 5.5</span></h1>
+  <p class="sub">Quatre épreuves en direct. Chaque décision part pour de vrai chez TypeSafe ou chez Anthropic.</p>
+  <div class="grid">
+    <a class="scene card" href="/trading"><div class="k">01 · Trading</div><h2>Scalping en direct</h2>
+      <p>Deux fonds sur Alpaca (compte paper). Les bougies arrivent chaque seconde, chacun décide long, short ou rien.</p></a>
+    <a class="scene card" href="/tetris"><div class="k">02 · Tetris</div><h2>Qui tient le rythme ?</h2>
+      <p>Mêmes pièces, chute de plus en plus rapide. Une décision qui arrive trop tard, et la pièce tombe n'importe où.</p></a>
+    <a class="scene card" href="/leads"><div class="k">03 · Prospection</div><h2>La course aux 100 leads</h2>
+      <p>Scout trouve les profils, Lightpanda lit les sites, chaque modèle juge si le lead a besoin d'une vidéo de lancement.</p></a>
+    <a class="scene card" href="/avis"><div class="k">04 · Avis clients</div><h2>Le tri en direct</h2>
+      <p>De vrais avis arrivent à la chaîne. Chacun devine la note et le sujet, et la vraie note du client tranche.</p></a>
+  </div>
+  <div class="status" id="status"></div>
+</main>
+<script>
+fetch("/api/status").then(r => r.json()).then(s => {
+  const lines = [];
+  for (const [k, v] of Object.entries(s.errors || {})) lines.push(`⚠ scène ${k} en erreur :\n${v}`);
+  document.getElementById("status").textContent = lines.join("\n");
+});
+</script>
+</body>
+</html>

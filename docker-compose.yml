@@ -1,0 +1,33 @@
+# Jev Arena : Jev (TypeSafe) contre Claude Opus 5.5, en direct.
+# Lancer : docker compose up -d --build   puis http://127.0.0.1:8800
+name: jev-arena
+
+services:
+  arena:
+    build: ./arena
+    env_file: .env
+    environment:
+      ARENA_DATA: /data
+      TZ: Europe/Paris
+      CRAWL4AI_URL: http://crawl4ai:11235
+    ports:
+      - "127.0.0.1:8800:8800"
+      # instances de test sans rechargement, une par scene (voir ARENA_DEV.md)
+      - "127.0.0.1:8801-8804:8801-8804"
+    volumes:
+      - ./arena/app:/srv/app      # code monte en direct (rechargement automatique)
+      - ./data:/data              # sessions enregistrees, ledger des couts
+    command: >
+      uvicorn app.main:app --host 0.0.0.0 --port 8800
+      --reload --reload-dir /srv/app --reload-exclude 'static/*'
+    depends_on:
+      - crawl4ai
+    restart: unless-stopped
+
+  crawl4ai:
+    image: unclecode/crawl4ai:latest
+    env_file: .env
+    shm_size: 1g
+    expose:
+      - "11235"
+    restart: unless-stopped

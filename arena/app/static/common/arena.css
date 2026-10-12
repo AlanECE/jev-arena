@@ -1,0 +1,107 @@
+/* Jev Arena : style commun des scenes (filmable en 1920x1080). Papier lilas de la chaine, SF Pro Display. */
+@font-face { font-family: "SF Pro Display"; src: url("/static/common/fonts/SFPRODISPLAYREGULAR.OTF"); font-weight: 400; }
+@font-face { font-family: "SF Pro Display"; src: url("/static/common/fonts/SFPRODISPLAYMEDIUM.OTF"); font-weight: 500; }
+@font-face { font-family: "SF Pro Display"; src: url("/static/common/fonts/SFPRODISPLAYBOLD.OTF"); font-weight: 700; }
+
+:root {
+  --paper: #f4f0fa;
+  --paper-2: #ebe4f6;
+  --card: #ffffff;
+  --ink: #17121f;
+  --ink-2: #5b5368;
+  --ink-3: #9a92a8;
+  --line: #e4ddef;
+  --violet: #7b3ff2;
+  --jev: #d63fae;          /* rose TypeSafe */
+  --jev-deep: #3a2433;
+  --jev-soft: #fbe6f5;
+  --opus: #d97757;         /* argile Claude */
+  --opus-deep: #6b3523;
+  --opus-soft: #fbebe4;
+  --long: #12a150;
+  --long-soft: #dcf5e6;
+  --short: #e5484d;
+  --short-soft: #fde3e4;
+  --flat: #8c8698;
+  --warn: #e8a317;
+  --radius: 18px;
+  --shadow: 0 1px 2px rgba(23, 18, 31, .05), 0 10px 30px rgba(91, 63, 160, .08);
+}
+
+* { box-sizing: border-box; }
+html, body { margin: 0; height: 100%; }
+body {
+  background: var(--paper);
+  color: var(--ink);
+  font-family: "SF Pro Display", -apple-system, "Segoe UI", system-ui, sans-serif;
+  font-weight: 500;
+  -webkit-font-smoothing: antialiased;
+  overflow: hidden;
+}
+.num { font-variant-numeric: tabular-nums; }
+
+/* Barre du haut */
+.topbar {
+  height: 72px; display: flex; align-items: center; gap: 18px; padding: 0 28px;
+  border-bottom: 1px solid var(--line); background: rgba(255, 255, 255, .55); backdrop-filter: blur(10px);
+}
+.topbar .title { font-size: 26px; font-weight: 700; letter-spacing: -.01em; }
+.topbar .title small { font-weight: 500; color: var(--ink-3); font-size: 18px; margin-left: 10px; }
+.topbar .spacer { flex: 1; }
+.topbar a.home { color: var(--ink-3); text-decoration: none; font-size: 15px; }
+
+/* Cartes */
+.card { background: var(--card); border-radius: var(--radius); box-shadow: var(--shadow); border: 1px solid var(--line); }
+
+/* En-tete de modele */
+.model-head { display: flex; align-items: center; gap: 14px; }
+.model-head img { width: 44px; height: 44px; border-radius: 12px; }
+.model-head .name { font-size: 28px; font-weight: 700; letter-spacing: -.01em; line-height: 1; }
+.model-head .maker { font-size: 14px; color: var(--ink-3); margin-top: 4px; }
+.jev .accent { color: var(--jev); }
+.opus .accent { color: var(--opus); }
+
+/* Statistiques */
+.stats { display: flex; gap: 22px; flex-wrap: wrap; }
+.stat .label { font-size: 13px; color: var(--ink-3); text-transform: uppercase; letter-spacing: .06em; }
+.stat .value { font-size: 30px; font-weight: 700; font-variant-numeric: tabular-nums; letter-spacing: -.01em; }
+.stat .value.small { font-size: 22px; }
+.pos { color: var(--long); }
+.neg { color: var(--short); }
+
+/* Badges de position */
+.badge {
+  display: inline-flex; align-items: center; gap: 8px; padding: 8px 16px; border-radius: 999px;
+  font-weight: 700; font-size: 20px; letter-spacing: .04em; transition: background .25s, color .25s, transform .25s;
+}
+.badge.long { background: var(--long-soft); color: var(--long); }
+.badge.short { background: var(--short-soft); color: var(--short); }
+.badge.flat { background: var(--paper-2); color: var(--flat); }
+.badge.pulse { transform: scale(1.08); }
+
+/* Boutons et puces */
+.btn {
+  font: inherit; font-weight: 700; font-size: 16px; border: 0; border-radius: 12px; padding: 10px 18px;
+  background: var(--ink); color: #fff; cursor: pointer;
+}
+.btn.ghost { background: transparent; color: var(--ink-2); border: 1px solid var(--line); }
+.btn.violet { background: var(--violet); }
+.btn:disabled { opacity: .4; cursor: default; }
+.chip { display: inline-flex; align-items: center; gap: 6px; padding: 5px 11px; border-radius: 999px; background: var(--paper-2);
+  color: var(--ink-2); font-size: 14px; }
+.chip.live::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: var(--short); animation: blink 1s infinite; }
+@keyframes blink { 50% { opacity: .2; } }
+select, input { font: inherit; font-size: 15px; padding: 8px 10px; border-radius: 10px; border: 1px solid var(--line); background: #fff; color: var(--ink); }
+
+/* Barres de progression */
+.progress { height: 18px; border-radius: 999px; background: var(--paper-2); overflow: hidden; }
+.progress > i { display: block; height: 100%; width: 0; border-radius: 999px; transition: width .35s cubic-bezier(.2, .8, .2, 1); }
+.jev .progress > i { background: var(--jev); }
+.opus .progress > i { background: var(--opus); }
+
+/* Bandeau d'erreur discret (les erreurs reelles restent visibles, c'est voulu) */
+.toast { position: fixed; right: 24px; bottom: 24px; max-width: 520px; padding: 12px 16px; border-radius: 12px;
+  background: var(--ink); color: #fff; font-size: 14px; opacity: 0; transform: translateY(8px); transition: .25s; z-index: 50; }
+.toast.show { opacity: .92; transform: none; }
+.conn { font-size: 13px; color: var(--ink-3); }
+.conn.off { color: var(--short); }

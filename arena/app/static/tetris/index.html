@@ -1,0 +1,717 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Tetris · Jev contre Claude Opus 5.5</title>
+<link rel="stylesheet" href="/static/common/arena.css">
+<style>
+  html, body { background: var(--paper); }
+  /* Scène fixe 1920x1080, mise à l'échelle de la fenêtre (identique quel que soit l'écran ou le zoom Windows) */
+  #stage { position: absolute; left: 0; top: 0; width: 1920px; height: 1080px; transform-origin: 0 0;
+    display: flex; flex-direction: column; background: var(--paper); }
+  .topbar { flex: 0 0 76px; height: 76px; gap: 20px; }
+  .topbar .duo { display: flex; align-items: center; gap: 8px; }
+  .topbar .duo img { width: 38px; height: 38px; border-radius: 10px; }
+  .topbar .title { font-size: 30px; }
+  .topbar .title small { font-size: 18px; }
+  .gauges { display: flex; gap: 34px; align-items: center; }
+  .gauge { text-align: center; }
+  .gauge .v { font-size: 34px; font-weight: 700; line-height: 1; font-variant-numeric: tabular-nums; letter-spacing: -.01em; }
+  .gauge .k { font-size: 12px; color: var(--ink-3); text-transform: uppercase; letter-spacing: .08em; margin-top: 4px; }
+  .gauge.fall .v { color: var(--violet); }
+  .gauge.clock .v { min-width: 104px; }
+  .topmeta { font-size: 14px; color: var(--ink-3); text-align: right; line-height: 1.35; }
+
+  main.lanes { flex: 1; display: grid; grid-template-columns: 1fr 1fr; gap: 20px; padding: 18px 20px 20px; min-height: 0; }
+  .lane { position: relative; display: flex; flex-direction: column; padding: 18px 22px 20px; min-height: 0; overflow: hidden; }
+  .lane::before { content: ""; position: absolute; left: 0; right: 0; top: 0; height: 5px; }
+  .lane.jev::before { background: var(--jev); }
+  .lane.opus::before { background: var(--opus); }
+  .lhead { display: flex; align-items: center; justify-content: space-between; height: 84px; flex: 0 0 84px; }
+  .lhead .model-head img { width: 58px; height: 58px; border-radius: 14px; }
+  .lhead .model-head .name { font-size: 36px; }
+  .lhead .model-head .maker { font-size: 15px; }
+  .lat { text-align: right; }
+  .lat .k { font-size: 13px; color: var(--ink-3); text-transform: uppercase; letter-spacing: .08em; }
+  .lat .v { font-size: 66px; font-weight: 700; line-height: .95; letter-spacing: -.03em; font-variant-numeric: tabular-nums; }
+  .lat .v.late { color: var(--short) !important; }
+  .lat .m { font-size: 15px; color: var(--ink-2); margin-top: 3px; font-variant-numeric: tabular-nums; }
+  .jev .lat .v { color: var(--jev); }
+  .opus .lat .v { color: var(--opus); }
+
+  .lbody { flex: 1; display: flex; gap: 22px; min-height: 0; margin-top: 14px; }
+  .boardwrap { position: relative; flex: 0 0 auto; height: 100%; }
+  .boardwrap canvas { display: block; border-radius: 14px; background: #fff; box-shadow: inset 0 0 0 1px var(--line); }
+  .jev .boardwrap canvas { box-shadow: inset 0 0 0 2px #f2c6e6; }
+  .opus .boardwrap canvas { box-shadow: inset 0 0 0 2px #f1d0c3; }
+  .flash { position: absolute; left: 50%; top: 42%; transform: translate(-50%, -50%) scale(.92); text-align: center; white-space: nowrap;
+    font-size: 30px; font-weight: 700; color: #fff; background: var(--short); border-radius: 16px; padding: 12px 22px 10px;
+    box-shadow: 0 12px 30px rgba(229, 72, 77, .35); opacity: 0; transition: opacity .16s ease, transform .16s ease; pointer-events: none; z-index: 3; }
+  .flash small { display: block; font-size: 14px; font-weight: 500; opacity: .92; margin-top: 3px; }
+  .flash.show { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+  .over { position: absolute; inset: 0; border-radius: 14px; background: rgba(244, 240, 250, .38); display: none;
+    align-items: center; justify-content: center; z-index: 4; text-align: center; }
+  .over .ovc { background: rgba(255, 255, 255, .95); border-radius: 18px; padding: 18px 22px 16px; box-shadow: 0 18px 50px rgba(42, 22, 80, .18);
+    display: flex; flex-direction: column; align-items: center; gap: 6px; max-width: 92%; }
+  .over .g { font-size: 40px; font-weight: 700; letter-spacing: -.01em; }
+  .over .s { font-size: 17px; color: var(--ink-2); }
+  .over .l { font-size: 58px; font-weight: 700; line-height: 1; margin-top: 4px; }
+  .over .l small { font-size: 20px; color: var(--ink-3); font-weight: 500; margin-left: 6px; }
+  .jev .over .l { color: var(--jev); } .opus .over .l { color: var(--opus); }
+
+  .side { flex: 1; display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+  .kpis { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .kpi { background: var(--paper); border-radius: 14px; padding: 10px 14px 9px; }
+  .kpi .k { font-size: 12px; color: var(--ink-3); text-transform: uppercase; letter-spacing: .07em; }
+  .kpi .v { font-size: 34px; font-weight: 700; line-height: 1.08; font-variant-numeric: tabular-nums; letter-spacing: -.01em; }
+  .kpi.lines .v { font-size: 46px; }
+  .jev .kpi.lines .v { color: var(--jev); } .opus .kpi.lines .v { color: var(--opus); }
+  .kpi.miss .v.bad { color: var(--short); }
+  .kpi .v small { font-size: 16px; color: var(--ink-3); font-weight: 500; margin-left: 4px; }
+
+  .now { border: 1px solid var(--line); border-radius: 14px; padding: 10px 14px 11px; }
+  .now .row { display: flex; justify-content: space-between; align-items: baseline; font-size: 15px; color: var(--ink-2); font-variant-numeric: tabular-nums; }
+  .now .row b { color: var(--ink); font-weight: 700; }
+  .now .state { font-weight: 700; font-size: 17px; }
+  .jev .now .state.okk { color: var(--jev); } .opus .now .state.okk { color: var(--opus); }
+  .now .state.bad { color: var(--short); }
+  .bar { position: relative; height: 14px; border-radius: 999px; background: var(--paper-2); margin: 8px 0 6px; overflow: hidden; }
+  .bar i { position: absolute; left: 0; top: 0; bottom: 0; width: 0; border-radius: 999px; }
+  .jev .bar i { background: var(--jev); } .opus .bar i { background: var(--opus); }
+  .bar i.bad { background: var(--short) !important; }
+
+  .choice { border: 1px solid var(--line); border-radius: 14px; padding: 10px 14px 11px; height: 178px; flex: 0 0 178px; overflow: hidden; }
+  .choice .hd { font-size: 12px; color: var(--ink-3); text-transform: uppercase; letter-spacing: .07em; display: flex; justify-content: space-between; }
+  .choice .ch { display: flex; gap: 12px; align-items: center; margin-top: 6px; }
+  .choice .letter { flex: 0 0 40px; height: 40px; border-radius: 11px; color: #fff; font-weight: 700; font-size: 24px; display: flex; align-items: center; justify-content: center; }
+  .jev .choice .letter { background: var(--jev); } .opus .choice .letter { background: var(--opus); }
+  .choice .desc { font-size: 17px; line-height: 1.25; color: var(--ink); }
+  .choice .tag { display: inline-block; font-size: 12px; font-weight: 700; padding: 2px 8px; border-radius: 999px; margin-left: 6px; vertical-align: 2px; }
+  .choice .tag.trap { background: var(--short-soft); color: var(--short); }
+  .probs { margin-top: 8px; display: flex; flex-direction: column; gap: 4px; }
+  .pr { display: flex; align-items: center; gap: 8px; font-size: 14px; color: var(--ink-2); font-variant-numeric: tabular-nums; }
+  .pr .t { width: 16px; font-weight: 700; color: var(--ink); }
+  .pr .b { flex: 1; height: 9px; border-radius: 5px; background: var(--paper-2); position: relative; overflow: hidden; }
+  .pr .b i { position: absolute; left: 0; top: 0; bottom: 0; border-radius: 5px; background: #cfc8da; }
+  .jev .pr .b i.sel { background: var(--jev); } .opus .pr .b i.sel { background: var(--opus); }
+  .pr .p { width: 44px; text-align: right; }
+  .pr.note { font-size: 13px; color: var(--ink-3); }
+  .err { font-size: 13px; color: var(--short); margin-top: 6px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+  .tl { flex: 1; min-height: 120px; display: flex; flex-direction: column; border: 1px solid var(--line); border-radius: 14px; padding: 9px 12px 8px; }
+  .tl .hd { font-size: 12px; color: var(--ink-3); text-transform: uppercase; letter-spacing: .07em; display: flex; justify-content: space-between; }
+  .tl .hd .lg { text-transform: none; letter-spacing: 0; font-size: 13px; }
+  .tl .hd .lg i { display: inline-block; width: 9px; height: 9px; border-radius: 50%; margin: 0 4px 0 10px; vertical-align: 0; }
+  .tl .hd .lg i.dash { width: 16px; height: 0; border-radius: 0; border-top: 2px dashed var(--ink-3); vertical-align: 3px; }
+  .jev .tl .lg i.ok { background: var(--jev); } .opus .tl .lg i.ok { background: var(--opus); }
+  .tl .lg i.late { background: var(--short); }
+  .tl .cv { flex: 1; min-height: 0; position: relative; }
+  .tl canvas { position: absolute; inset: 0; }
+
+  #hint { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); z-index: 20; background: var(--ink); color: #fff;
+    border-radius: 22px; padding: 22px 34px 20px; text-align: center; box-shadow: 0 30px 80px rgba(23, 18, 31, .3); min-width: 520px; }
+  #hint .a { font-size: 34px; font-weight: 700; letter-spacing: -.01em; }
+  #hint .a kbd { font: inherit; background: rgba(255,255,255,.14); border-radius: 10px; padding: 2px 14px; }
+  #hint .b { font-size: 16px; color: #cfc8da; margin-top: 8px; line-height: 1.4; }
+  #hint .c { font-size: 15px; color: #a79fb6; margin-top: 12px; font-variant-numeric: tabular-nums; }
+  #hint .c kbd { font: inherit; font-weight: 700; color: #fff; background: rgba(255,255,255,.14); border-radius: 7px; padding: 1px 9px; }
+  .go { font: inherit; font-weight: 700; font-size: 30px; letter-spacing: -.01em; color: #fff; background: var(--violet); border: 0;
+    border-radius: 16px; padding: 16px 44px; margin-top: 18px; cursor: pointer; box-shadow: 0 12px 30px rgba(123, 63, 242, .35);
+    transition: transform .18s cubic-bezier(.2, .8, .2, 1), background .2s, opacity .2s; }
+  .go:hover { transform: translateY(-2px); }
+  .go:disabled { background: #4a4258; box-shadow: none; cursor: default; opacity: .8; transform: none; }
+  .go.light { font-size: 22px; padding: 12px 30px; margin-top: 0; }
+  #stage.running { cursor: none; }
+  .topmeta b { color: var(--ink); font-weight: 700; font-variant-numeric: tabular-nums; }
+
+  #result { position: absolute; left: 50%; top: 52%; transform: translate(-50%, -50%) scale(.96); z-index: 30; width: 1180px; padding: 30px 40px 26px;
+    opacity: 0; transition: opacity .4s ease, transform .4s cubic-bezier(.2, .8, .2, 1); pointer-events: none;
+    box-shadow: 0 40px 120px rgba(42, 22, 80, .28); }
+  #result.show { opacity: 1; transform: translate(-50%, -50%) scale(1); pointer-events: auto; }
+  #result h2 { margin: 0; font-size: 22px; color: var(--ink-3); text-transform: uppercase; letter-spacing: .08em; font-weight: 500; }
+  #result .verdict { font-size: 44px; font-weight: 700; letter-spacing: -.02em; margin: 6px 0 18px; }
+  #result table { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; }
+  #result th { text-align: right; font-size: 15px; color: var(--ink-3); text-transform: uppercase; letter-spacing: .07em; font-weight: 500; padding: 0 12px 10px; }
+  #result th:first-child, #result td:first-child { text-align: left; }
+  #result td { text-align: right; font-size: 26px; font-weight: 700; padding: 12px 12px; border-top: 1px solid var(--line); }
+  #result td:first-child { font-size: 18px; color: var(--ink-2); font-weight: 500; }
+  #result th.jev, #result td.jev { color: var(--jev); } #result th.opus, #result td.opus { color: var(--opus); }
+  #result th img { width: 30px; height: 30px; border-radius: 8px; vertical-align: -8px; margin-right: 8px; }
+  #result th .nm { font-size: 22px; font-weight: 700; text-transform: none; letter-spacing: 0; }
+  #result td.jev.win { background: var(--jev-soft); } #result td.opus.win { background: var(--opus-soft); }
+  #veil { position: absolute; inset: 0; z-index: 29; background: rgba(244, 240, 250, .62); opacity: 0; transition: opacity .4s ease; pointer-events: none; }
+  #veil.show { opacity: 1; }
+  #result .foot { margin-top: 16px; font-size: 14px; color: var(--ink-3); line-height: 1.45; flex: 1; }
+  #result .bottom { display: flex; align-items: flex-end; gap: 28px; }
+  #banner { position: absolute; left: 50%; bottom: 26px; transform: translateX(-50%); z-index: 25; background: var(--short); color: #fff;
+    font-size: 18px; font-weight: 700; padding: 10px 20px; border-radius: 12px; display: none; }
+</style>
+</head>
+<body>
+<div id="stage">
+  <header class="topbar">
+    <div class="duo"><img src="/static/common/logos/typesafe-icon.png" alt=""><img src="/static/common/logos/claude.png" alt=""></div>
+    <div class="title">Tetris <small>mêmes pièces · une décision en retard, la pièce tombe où elle est apparue</small></div>
+    <div class="spacer"></div>
+    <div class="gauges">
+      <div class="gauge clock"><div class="v" id="clk">0:00</div><div class="k">chrono</div></div>
+      <div class="gauge"><div class="v" id="lvl">1</div><div class="k">niveau</div></div>
+      <div class="gauge"><div class="v" id="spd">–</div><div class="k">par ligne</div></div>
+      <div class="gauge fall"><div class="v" id="fall">–</div><div class="k">chute complète</div></div>
+    </div>
+    <div class="topmeta" id="topmeta"></div>
+  </header>
+  <main class="lanes" id="lanes"></main>
+  <div id="hint"><div class="a">Tetris · Jev contre Claude Opus 5.5</div>
+    <div class="b">Connexion aux deux modèles…</div>
+    <button class="go" id="go" disabled>Préparation…</button><div class="c">&nbsp;</div></div>
+  <div id="veil"></div>
+  <div id="result" class="card"></div>
+  <div id="banner"></div>
+</div>
+<script src="/static/common/arena.js"></script>
+<script>
+// =====================================================================================================
+// Paramètres (URL) : g0, levelsec, speedup, gmin, seed, max, auto, name, k, inflight, st
+// =====================================================================================================
+const P = new URLSearchParams(location.search);
+const LANES = ['jev', 'opus'];                         // Jev à gauche, Opus à droite, toujours
+const SEED = +(P.get('seed') || 7);
+const AUTO = P.get('auto') === '1';
+const NAME = P.get('name') || '';
+const MAXSEC = +(P.get('max') || 240);
+// Gravité : G0 ms par ligne de chute pendant HOLD secondes (niveau 1), puis multipliée par SPEEDUP toutes les
+// LEVELSEC secondes, plancher GMIN. Réglée pour Opus (≈ 2-4 s par décision) contre Jev (≈ 0,25-0,5 s).
+const G0 = +(P.get('g0') || 280), HOLD = +(P.get('hold') ?? 40), LEVELSEC = +(P.get('levelsec') || 5),
+  SPEEDUP = +(P.get('speedup') || 0.87), GMIN = +(P.get('gmin') || 4);
+const KOPT = +(P.get('k') || 6);                        // options proposées au modèle (A-F)
+const MAXINFLIGHT = +(P.get('inflight') || 8);          // requêtes en attente max par couloir (même règle pour les deux)
+const STATE_FULL = P.get('st') === 'full';
+const PAGE = Math.random().toString(36).slice(2, 10);
+const H_ROWS = 20, W = 10, H = 20;
+
+// =====================================================================================================
+// Outils
+// =====================================================================================================
+function mulberry32(a){return function(){a|=0;a=a+0x6D2B79F5|0;let t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296}}
+function hash(s){let h=2166136261;for(const ch of s){h^=ch.charCodeAt(0);h=Math.imul(h,16777619)}return h>>>0}
+const now = () => performance.now();
+const pct = (arr, p) => { if (!arr.length) return null; const a = [...arr].sort((x, y) => x - y); return a[Math.min(a.length - 1, Math.floor(p * (a.length - 1) + 0.5))]; };
+const avg = a => a.length ? a.reduce((x, y) => x + y, 0) / a.length : null;
+const sec = (ms, d = 1) => ms == null ? '–' : (ms / 1000).toFixed(d).replace('.', ',') + ' s';
+const $ = (s, el = document) => el.querySelector(s);
+
+// =====================================================================================================
+// Transport des décisions : WebSocket /ws/tetris (pas de limite de 6 connexions par hôte comme fetch),
+// repli en HTTP si la connexion est fermée. Chaque décision a son identifiant (rid).
+// =====================================================================================================
+const PENDING = new Map();
+let WS_OK = false, RID = 0;
+const WS = Arena.connect('tetris', (ev) => {
+  if (ev.type === 'decided' && ev.page === PAGE) {
+    const p = PENDING.get(ev.rid); if (!p) return;
+    PENDING.delete(ev.rid); clearTimeout(p.timer); p.resolve(ev.result || {ok: false, error: 'réponse vide'});
+  }
+}, (ok) => { WS_OK = ok; });
+
+function decideRemote(lane, state, questions, tag, piece) {
+  const t0 = now();
+  const done = (d) => { d = d || {}; d.rtt_ms = now() - t0; return d; };
+  if (!WS_OK) {
+    return fetch('/api/tetris/decide', {method: 'POST', headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({lane, state, questions, tag, piece})}).then(r => r.json()).then(done)
+      .catch(e => done({ok: false, error: 'réseau : ' + e.message}));
+  }
+  return new Promise((resolve) => {
+    const rid = PAGE + '-' + (++RID);
+    const timer = setTimeout(() => { PENDING.delete(rid); resolve(done({ok: false, error: 'pas de réponse en 60 s (connexion perdue ?)'})); }, 60000);
+    PENDING.set(rid, {resolve: (d) => resolve(done(d)), timer});
+    WS.send({cmd: 'decide', rid, page: PAGE, lane, state, questions, tag, piece});
+  });
+}
+function sendEvent(type, data) { if (WS_OK) WS.send({cmd: 'event', type, ...data}); }
+
+// =====================================================================================================
+// Moteur Tetris (repris du test uc5 de septembre, mesuré)
+// =====================================================================================================
+const BASE = {I:[[0,0],[1,0],[2,0],[3,0]], O:[[0,0],[1,0],[0,1],[1,1]], T:[[0,0],[1,0],[2,0],[1,1]],
+  S:[[1,0],[2,0],[0,1],[1,1]], Z:[[0,0],[1,0],[1,1],[2,1]], L:[[0,0],[1,0],[2,0],[0,1]], J:[[0,0],[1,0],[2,0],[2,1]]};
+const COLORS = {I:'#2bbfe0', O:'#f4c21b', T:'#9a5ae6', S:'#2fb86e', Z:'#ec4f5b', L:'#f28a2e', J:'#3f78e0'};
+const MISS_COLOR = '#b4abc2';   // pièce tombée sans décision
+function norm(cells){const mx=Math.min(...cells.map(c=>c[0])),my=Math.min(...cells.map(c=>c[1]));return cells.map(([x,y])=>[x-mx,y-my]).sort((a,b)=>a[1]-b[1]||a[0]-b[0])}
+const ROTS = {};
+for (const k in BASE) { const seen = new Set(); ROTS[k] = []; let c = BASE[k];
+  for (let r = 0; r < 4; r++) { const n = norm(c), key = JSON.stringify(n); if (!seen.has(key)) { seen.add(key); ROTS[k].push(n); } c = c.map(([x, y]) => [-y, x]); } }
+function pieceSeq(seed, n) { const rng = mulberry32(seed), out = []; while (out.length < n) { const bag = 'IOTSZLJ'.split(''); for (let i = bag.length - 1; i > 0; i--) { const j = Math.floor(rng() * (i + 1)); [bag[i], bag[j]] = [bag[j], bag[i]]; } out.push(...bag); } return out; }
+const emptyBoard = () => Array.from({length: H}, () => Array(W).fill(null));
+function collide(b, cells, x, y) { for (const [cx, cy] of cells) { const X = x + cx, Y = y + cy; if (X < 0 || X >= W || Y >= H) return true; if (Y >= 0 && b[Y][X]) return true; } return false; }
+function place(b, cells, x, y, col) { const nb = b.map(r => r.slice()); for (const [cx, cy] of cells) if (y + cy >= 0) nb[y + cy][x + cx] = col; let lines = 0; const kept = nb.filter(r => { const full = r.every(v => v); if (full) lines++; return !full; }); while (kept.length < H) kept.unshift(Array(W).fill(null)); return {b: kept, lines}; }
+function feats(b) { const hs = []; let holes = 0; for (let x = 0; x < W; x++) { let h = 0, seen = false; for (let y = 0; y < H; y++) { if (b[y][x]) { if (!seen) { h = H - y; seen = true; } } else if (seen) holes++; } hs.push(h); }
+  let bump = 0; for (let x = 0; x < W - 1; x++) bump += Math.abs(hs[x] - hs[x + 1]);
+  return {holes, maxH: Math.max(...hs), agg: hs.reduce((a, c) => a + c, 0), bump}; }
+const heurScore = f => -0.510066 * f.agg + 0.760666 * f.lines - 0.35663 * f.holes - 0.184483 * f.bump;
+function candidates(b, kind) {
+  const f0 = feats(b), out = [], seen = new Set();
+  ROTS[kind].forEach((cells, r) => { const w = Math.max(...cells.map(c => c[0])) + 1;
+    for (let x = 0; x <= W - w; x++) { if (collide(b, cells, x, 0)) continue; let y = 0; while (!collide(b, cells, x, y + 1)) y++;
+      const res = place(b, cells, x, y, kind), f = feats(res.b); f.lines = res.lines; f.newHoles = Math.max(0, f.holes - f0.holes);
+      const key = res.b.map(r => r.map(v => v ? 1 : 0).join('')).join('|'); if (seen.has(key)) continue; seen.add(key);
+      out.push({r, x, y, f, score: heurScore(f)}); } });
+  return out;
+}
+const dominates = (a, b) => a.f.lines >= b.f.lines && a.f.newHoles <= b.f.newHoles && a.f.maxH <= b.f.maxH && a.f.bump <= b.f.bump &&
+  (a.f.lines > b.f.lines || a.f.newHoles < b.f.newHoles || a.f.maxH < b.f.maxH || a.f.bump < b.f.bump);
+function surf(bump) { return bump <= 4 ? 'flat surface' : bump <= 9 ? 'bumpy surface' : 'very jagged surface'; }
+// Texte envoyé au modèle (anglais, formulation mesurée en septembre)
+function describe(c) { const f = c.f;
+  return `${f.lines ? 'CLEARS ' + f.lines + (f.lines > 1 ? ' LINES' : ' LINE') : 'clears nothing'}, ${f.newHoles ? f.newHoles + (f.newHoles > 1 ? ' new holes' : ' new hole') : 'no new hole'}, stack height ${f.maxH}, ${surf(f.bump)}`; }
+// Même information, en français pour l'écran
+function describeFR(c) { const f = c.f;
+  return [f.lines ? `efface ${f.lines} ligne${f.lines > 1 ? 's' : ''}` : 'aucune ligne',
+    f.newHoles ? `${f.newHoles} trou${f.newHoles > 1 ? 's' : ''} créé${f.newHoles > 1 ? 's' : ''}` : 'aucun trou',
+    `hauteur ${f.maxH}`, f.bump <= 4 ? 'surface plate' : f.bump <= 9 ? 'surface bosselée' : 'surface très irrégulière'].join(' · '); }
+// Question : front de Pareto (placements non dominés) + « pièges » dominés, mélangés, étiquetés A..F.
+function buildTetrisDecision(b, kind, next, level, tagSeed) {
+  const all = candidates(b, kind); if (!all.length) return null;
+  const front = all.filter(c => !all.some(o => dominates(o, c)));
+  const rng = mulberry32(hash(tagSeed));
+  let pick = front.slice().sort((a, c) => c.score - a.score).slice(0, KOPT);
+  const traps = all.filter(c => !pick.includes(c)); for (let i = traps.length - 1; i > 0; i--) { const j = Math.floor(rng() * (i + 1)); [traps[i], traps[j]] = [traps[j], traps[i]]; }
+  while (pick.length < Math.min(KOPT, all.length) && traps.length) pick.push(traps.shift());
+  for (let i = pick.length - 1; i > 0; i--) { const j = Math.floor(rng() * (i + 1)); [pick[i], pick[j]] = [pick[j], pick[i]]; }
+  const labels = 'ABCDEFGHIJ'; const opts = {}; const criteria = {};
+  pick.forEach((c, i) => { opts[labels[i]] = c; criteria[labels[i]] = describe(c); });
+  const f0 = feats(b); const best = Object.keys(opts).reduce((a, k) => opts[k].score > opts[a].score ? k : a, 'A');
+  const frontKeys = Object.keys(opts).filter(k => front.includes(opts[k]));
+  return { opts, best, frontKeys, nAll: all.length,
+    state: STATE_FULL ? {game: 'tetris', piece: kind, next_piece: next, stack_height: f0.maxH, holes: f0.holes, level} : {game: 'tetris', falling_piece: kind},
+    questions: {placement: {type: 'choice', instructions: 'Where should the falling Tetris piece go? Pick the option that clears the most lines and creates no new holes, keeping the stack low and flat.', criteria}} };
+}
+
+// =====================================================================================================
+// Vitesse
+// =====================================================================================================
+const levelAt = (el) => el < HOLD * 1000 ? 1 : (HOLD > 0 ? 2 : 1) + Math.floor((el - HOLD * 1000) / 1000 / LEVELSEC);
+function gravityMs(el) { return Math.max(GMIN, G0 * Math.pow(SPEEDUP, levelAt(el) - 1)); }
+// Temps réel pour descendre `ticks` lignes à partir de l'instant el (la gravité change en route)
+function fallTime(el0, ticks) { let t = el0; for (let i = 0; i < ticks; i++) t += gravityMs(t); return t - el0; }
+const FULL_TICKS = H - 1;   // pièce de 2 lignes, plateau vide : 18 lignes de chute + 1 pas pour se poser
+
+// =====================================================================================================
+// Couloirs
+// =====================================================================================================
+const SEQ = pieceSeq(SEED, 4000);
+const LS = [];
+let T_START = 0, RUNNING = false, FINISHED = false, READY = false, BUDGET_HIT = false;
+const elNow = () => RUNNING || FINISHED ? now() - T_START : 0;
+
+function laneUI(id) {
+  const el = document.createElement('section'); el.className = `lane card ${id}`;
+  el.innerHTML = `
+  <div class="lhead">
+    <div class="model-head"><img src="${Arena.LOGOS[id]}" alt=""><div><div class="name accent">${Arena.NAMES[id]}</div><div class="maker">${Arena.MAKERS[id]}</div></div></div>
+    <div class="lat"><div class="k">dernière décision</div><div class="v num">–</div><div class="m">médiane – · aller-retour</div></div>
+  </div>
+  <div class="lbody">
+    <div class="boardwrap"><canvas class="board"></canvas>
+      <div class="flash">DÉCISION RATÉE<small></small></div>
+      <div class="over"><div class="ovc"><div class="g">GAME OVER</div><div class="s"></div><div class="l"></div></div></div></div>
+    <div class="side">
+      <div class="kpis">
+        <div class="kpi lines"><div class="k">lignes</div><div class="v">0</div></div>
+        <div class="kpi"><div class="k">pièces posées</div><div class="v pieces">0</div></div>
+        <div class="kpi"><div class="k">décisions reçues</div><div class="v dec">0</div></div>
+        <div class="kpi miss"><div class="k">décisions ratées</div><div class="v missed">0</div></div>
+        <div class="kpi"><div class="k">coût réel</div><div class="v cost">$0</div></div>
+        <div class="kpi"><div class="k">pièges choisis</div><div class="v traps">0</div></div>
+      </div>
+      <div class="now">
+        <div class="row"><span class="pc">pièce –</span><span class="state">en attente du départ</span></div>
+        <div class="bar"><i></i></div>
+        <div class="row"><span class="nl"></span><span class="nr"></span></div>
+      </div>
+      <div class="choice">
+        <div class="hd"><span>dernier choix</span><span class="cf"></span></div>
+        <div class="ch"><span class="letter">–</span><span class="desc" style="color:var(--ink-3)">pas encore de décision</span></div>
+        <div class="probs"></div><div class="err"></div>
+      </div>
+      <div class="tl">
+        <div class="hd"><span>temps de décision</span><span class="lg"><i class="ok"></i>à temps<i class="late"></i>trop tard<i class="dash"></i>chute complète</span></div>
+        <div class="cv"><canvas></canvas></div>
+      </div>
+    </div>
+  </div>`;
+  $('#lanes').appendChild(el);
+  const q = (s) => $(s, el);
+  return {el, lat: q('.lat .v'), latm: q('.lat .m'), cv: q('canvas.board'), wrap: q('.boardwrap'), flash: q('.flash'), flashSmall: q('.flash small'),
+    over: q('.over'), lines: q('.kpi.lines .v'), pieces: q('.pieces'), dec: q('.dec'), missed: q('.missed'), cost: q('.cost'), traps: q('.traps'),
+    pc: q('.now .pc'), state: q('.now .state'), bar: q('.now .bar i'), nl: q('.now .nl'), nr: q('.now .nr'),
+    letter: q('.choice .letter'), desc: q('.choice .desc'), probs: q('.probs'), cf: q('.choice .cf'), err: q('.err'),
+    tl: q('.tl canvas'), tlBox: q('.tl .cv')};
+}
+function newLane(id) {
+  return {id, ui: laneUI(id), b: emptyBoard(), idx: 0, p: null, lines: 0, pieces: 0, missed: 0, late: 0, answered: 0, errors: 0,
+    skipped: 0, inflight: 0, cost: 0, rtt: [], lat: [], over: false, tOver: null, cause: '', q: {n: 0, best: 0, front: 0, trap: 0},
+    log: [], pieceLog: [], lastLate: false, cell: 40};
+}
+
+function spawn(L) {
+  const kind = SEQ[L.idx], next = SEQ[L.idx + 1]; L.idx++;
+  const cells = ROTS[kind][0], w = Math.max(...cells.map(c => c[0])) + 1, x = Math.floor((W - w) / 2);
+  const el = elNow();
+  L.p = {kind, r: 0, x, y: 0, id: L.idx, acc: 0, decided: false, dx: x, tSpawn: el, t0: now()};
+  if (collide(L.b, cells, x, 0)) { L.p = null; gameOver(L, 'la pile touche le plafond'); return; }
+  let d0 = 0; while (!collide(L.b, cells, x, d0 + 1)) d0++;
+  L.p.budget = fallTime(el, d0 + 1);   // temps avant que la pièce se pose si aucune décision n'arrive
+  const dec = buildTetrisDecision(L.b, kind, next, levelAt(el), SEED + ':' + L.idx + ':' + L.b.map(r => r.map(v => v ? 1 : 0).join('')).join(''));
+  L.p.dec = dec; if (!dec) return;
+  if (BUDGET_HIT) { L.p.noreq = 'plafond de dépense atteint'; L.skipped++; return; }
+  if (L.inflight >= MAXINFLIGHT) { L.p.noreq = `aucune requête : ${MAXINFLIGHT} déjà en attente`; L.skipped++; return; }
+  const p = L.p, pid = p.id; L.inflight++; p.req = true;
+  decideRemote(L.id, dec.state, dec.questions, 'tetris-race', pid).then(d => onAnswer(L, p, dec, d));
+}
+
+function onAnswer(L, p, dec, d) {
+  L.inflight--;
+  if (FINISHED && !RUNNING) { L.cost += d.cost || 0; return; }
+  const rec = {piece: p.id, kind: p.kind, t: +(p.tSpawn / 1000).toFixed(3), rtt: Math.round(d.rtt_ms), lat: d.latency_ms, cost: d.cost || 0,
+    budget: Math.round(p.budget), choice: null, best: dec.best, front: null, onTime: false, err: d.error || null};
+  L.cost += d.cost || 0; L.rtt.push(d.rtt_ms); if (d.latency_ms) L.lat.push(d.latency_ms);
+  if (d.budget_exceeded) { BUDGET_HIT = true; showBanner('Plafond de dépense de la scène atteint : plus aucune requête.'); }
+  const a = d.ok && d.answers && d.answers.placement;
+  const ch = a && a.choice in dec.opts ? a.choice : null;
+  if (!ch) { L.errors++; rec.err = d.error || 'réponse sans option valide'; L.ui.err.textContent = `Erreur n° ${L.errors} : ` + frErr(rec.err); p.errored = true; }
+  else {
+    L.answered++; rec.choice = ch; rec.front = dec.frontKeys.includes(ch);
+    L.q.n++; if (ch === dec.best) L.q.best++; if (rec.front) L.q.front++; else L.q.trap++;
+    if (a.probabilities) rec.p = a.probabilities[ch]; if (a.confidence != null) rec.conf = a.confidence;
+    showChoice(L, dec, ch, a);
+  }
+  const current = !L.over && RUNNING && L.p === p;
+  if (current && ch) {
+    if (applyTarget(L, p, dec.opts[ch])) { p.decided = true; p.rtt = d.rtt_ms; rec.onTime = true; }
+    else { p.blocked = true; rec.blocked = true; }
+  } else if (ch) { rec.late = true; L.late++; }
+  L.lastLate = !rec.onTime;
+  L.log.push(rec);
+  Arena.set(L.ui.lat, Arena.ms(d.rtt_ms), 'v num' + (rec.onTime ? '' : ' late'));
+  L.ui.latm.textContent = `médiane ${Arena.ms(pct(L.rtt, .5))} · aller-retour`;
+}
+
+const frErr = (e) => String(e).replace(/reponse/g, 'réponse').replace(/requete echouee/g, 'requête échouée').replace(/illisible/g, 'illisible');
+function showChoice(L, dec, ch, a) {
+  const u = L.ui, trap = !dec.frontKeys.includes(ch);
+  u.letter.textContent = ch;
+  u.desc.style.color = '';
+  u.desc.innerHTML = describeFR(dec.opts[ch]) + (trap ? '<span class="tag trap">piège</span>' : '');
+  if (a.probabilities) {
+    const pr = a.probabilities, ks = Object.keys(pr).sort((x, y) => pr[y] - pr[x]).slice(0, 3);
+    u.cf.textContent = 'probabilités calculées';
+    u.probs.innerHTML = ks.map(k => `<div class="pr"><span class="t">${k}</span><span class="b"><i class="${k === ch ? 'sel' : ''}" style="width:${(pr[k] * 100).toFixed(1)}%"></i></span><span class="p">${Math.round(pr[k] * 100)} %</span></div>`).join('');
+  } else {
+    const c = a.confidence;
+    u.cf.textContent = 'confiance déclarée';
+    u.probs.innerHTML = (c != null ? `<div class="pr"><span class="t">${ch}</span><span class="b"><i class="sel" style="width:${(c * 100).toFixed(1)}%"></i></span><span class="p">${Math.round(c * 100)} %</span></div>` : '') +
+      `<div class="pr note">annoncée par le modèle dans son JSON, pas une probabilité calculée</div>`;
+  }
+}
+
+// Déplace la pièce vers la position choisie (rotation + colonne) si le chemin est libre à sa hauteur actuelle
+function applyTarget(L, p, c) {
+  const tc = ROTS[p.kind][c.r];
+  const path = (cells, x0, x1) => { const s = x1 > x0 ? 1 : -1; let x = x0; for (;;) { if (collide(L.b, cells, x, p.y)) return false; if (x === x1) return true; x += s; } };
+  const cur = ROTS[p.kind][p.r];
+  const ok = (!collide(L.b, tc, p.x, p.y) && path(tc, p.x, c.x)) || (path(cur, p.x, c.x) && !collide(L.b, tc, c.x, p.y));
+  if (!ok) return false; p.r = c.r; p.x = c.x; p.decided = true; return true;
+}
+
+function lock(L) {
+  const p = L.p, cells = ROTS[p.kind][p.r];
+  let why = null;
+  if (!p.decided) {
+    L.missed++;
+    why = p.noreq ? p.noreq : p.blocked ? 'réponse arrivée, mais la pièce était déjà trop bas' : p.errored ? 'réponse invalide' : 'réponse pas encore arrivée';
+    showFlash(L, why);
+  }
+  const res = place(L.b, cells, p.x, p.y, p.decided ? COLORS[p.kind] : MISS_COLOR);
+  L.b = res.b; L.lines += res.lines; L.pieces++;
+  const el = elNow();
+  const pl = {piece: p.id, kind: p.kind, t_spawn: +(p.tSpawn / 1000).toFixed(3), t_lock: +(el / 1000).toFixed(3), decided: !!p.decided, lines: res.lines, why};
+  L.pieceLog.push(pl); sendEvent('piece', {lane: L.id, ...pl, total_lines: L.lines});
+  if (res.lines) L.ui.lines.animate([{transform: 'scale(1.18)'}, {transform: 'scale(1)'}], {duration: 380, easing: 'cubic-bezier(.2,.8,.2,1)'});
+  spawn(L);
+}
+
+function stepTetris(L, dt, g) {
+  if (L.over || !L.p) return;
+  L.p.acc += dt; const cells = ROTS[L.p.kind][L.p.r];
+  while (L.p.acc >= g) { L.p.acc -= g; if (collide(L.b, cells, L.p.x, L.p.y + 1)) { lock(L); return; } L.p.y++; }
+}
+
+function showFlash(L, why) {
+  L.ui.flashSmall.textContent = why || '';
+  L.ui.flash.classList.add('show'); clearTimeout(L.ft); L.ft = setTimeout(() => L.ui.flash.classList.remove('show'), 950);
+}
+function showBanner(msg) { const b = $('#banner'); b.textContent = msg; b.style.display = 'block'; }
+
+function gameOver(L, cause) {
+  if (L.over) return; L.over = true; L.tOver = elNow() / 1000; L.cause = cause;
+  L.ui.over.style.display = 'flex';
+  $('.s', L.ui.over).textContent = `${sec(L.tOver * 1000)} · ${cause}`;
+  $('.l', L.ui.over).innerHTML = `${L.lines}<small>ligne${L.lines > 1 ? 's' : ''}</small>`;
+  sendEvent('game_over', {lane: L.id, t: L.tOver, cause, lines: L.lines, pieces: L.pieces, missed: L.missed});
+}
+
+// =====================================================================================================
+// Rendu
+// =====================================================================================================
+let SCALE = 1;
+function fitStage() {
+  SCALE = Math.min(innerWidth / 1920, innerHeight / 1080);
+  const st = $('#stage');
+  st.style.transform = `scale(${SCALE})`;
+  st.style.left = Math.max(0, (innerWidth - 1920 * SCALE) / 2) + 'px';
+  st.style.top = Math.max(0, (innerHeight - 1080 * SCALE) / 2) + 'px';
+  for (const L of LS) sizeLane(L);
+}
+function sizeLane(L) {
+  const h = L.ui.wrap.parentElement.clientHeight;
+  L.cell = Math.floor(h / H);
+  const r = devicePixelRatio * SCALE;
+  L.ui.cv.width = Math.round(W * L.cell * r); L.ui.cv.height = Math.round(H * L.cell * r);
+  L.ui.cv.style.width = W * L.cell + 'px'; L.ui.cv.style.height = H * L.cell + 'px';
+  L.ui.wrap.style.width = W * L.cell + 'px';
+  const bw = L.ui.tlBox.clientWidth, bh = L.ui.tlBox.clientHeight;
+  L.ui.tl.width = Math.round(bw * r); L.ui.tl.height = Math.round(bh * r);
+  L.ui.tl.style.width = bw + 'px'; L.ui.tl.style.height = bh + 'px';
+  L.tlW = bw; L.tlH = bh;
+}
+
+function drawBoard(L, dt) {
+  const c = L.ui.cv.getContext('2d'), r = devicePixelRatio * SCALE, s = L.cell;
+  c.setTransform(r, 0, 0, r, 0, 0); c.clearRect(0, 0, W * s, H * s);
+  c.strokeStyle = '#f1ecf7'; c.lineWidth = 1;
+  for (let x = 1; x < W; x++) { c.beginPath(); c.moveTo(x * s + .5, 0); c.lineTo(x * s + .5, H * s); c.stroke(); }
+  for (let y = 1; y < H; y++) { c.beginPath(); c.moveTo(0, y * s + .5); c.lineTo(W * s, y * s + .5); c.stroke(); }
+  const cell = (x, y, col, a = 1, ghost = false) => {
+    c.globalAlpha = a; c.beginPath(); c.roundRect(x * s + 2, y * s + 2, s - 4, s - 4, s * .2);
+    if (ghost) { c.strokeStyle = col; c.lineWidth = 2; c.setLineDash([5, 4]); c.stroke(); c.setLineDash([]); }
+    else { c.fillStyle = col; c.fill(); c.globalAlpha = a * .22; c.fillStyle = '#fff'; c.beginPath(); c.roundRect(x * s + 5, y * s + 4, s - 10, s * .22, s * .1); c.fill(); }
+    c.globalAlpha = 1; };
+  for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) if (L.b[y][x]) cell(x, y, L.b[y][x]);
+  const p = L.p;
+  if (p && !L.over) {
+    const cells = ROTS[p.kind][p.r];
+    // glissement horizontal doux quand la décision arrive (affichage seulement)
+    p.dx += (p.x - p.dx) * Math.min(1, dt / 70); if (Math.abs(p.x - p.dx) < .01) p.dx = p.x;
+    if (p.decided) { let gy = p.y; while (!collide(L.b, cells, p.x, gy + 1)) gy++;
+      const lc = L.id === 'jev' ? '#d63fae' : '#d97757';
+      for (const [cx, cy] of cells) cell(p.x + cx, gy + cy, lc, .75, true); }
+    // descente continue entre deux lignes (affichage seulement, la logique reste ligne par ligne)
+    const g = RUNNING ? gravityMs(elNow()) : G0;
+    const frac = RUNNING && !collide(L.b, cells, p.x, p.y + 1) ? Math.min(1, p.acc / g) : 0;
+    for (const [cx, cy] of cells) cell(p.dx + cx, p.y + frac + cy, COLORS[p.kind]);
+  }
+}
+
+// Petit graphique : chaque décision (x = moment où la pièce apparaît, y = temps de réponse, échelle log)
+// et la courbe « chute complète » (temps qu'une pièce met à tomber sur un plateau vide).
+let T_END = 0; for (let t = 0; t < MAXSEC; t += 1) { T_END = t; if (fallTime(t * 1000, FULL_TICKS) < 450) break; }
+function xMax() { const base = Math.min(MAXSEC, Math.ceil((T_END + 15) / 30) * 30), e = elNow() / 1000;
+  return e > base - 4 ? Math.min(MAXSEC, Math.ceil((e + 20) / 30) * 30) : base; }
+function drawTimeline(L) {
+  if (L.ui.tlBox.clientWidth !== L.tlW || L.ui.tlBox.clientHeight !== L.tlH) sizeLane(L);
+  const c = L.ui.tl.getContext('2d'), r = devicePixelRatio * SCALE, w = L.tlW, h = L.tlH;
+  if (!w || !h) return;
+  c.setTransform(r, 0, 0, r, 0, 0); c.clearRect(0, 0, w, h);
+  const pl = 44, pr = 6, pt = 6, pb = 20, X1 = xMax();
+  const X = t => pl + (w - pl - pr) * Math.min(1, t / X1);
+  const lo = Math.log10(0.1), hi = Math.log10(12);
+  const Y = ms => { const v = Math.log10(Math.max(100, Math.min(12000, ms)) / 1000); return pt + (h - pt - pb) * (1 - (v - lo) / (hi - lo)); };
+  c.font = '500 12px "SF Pro Display", system-ui, sans-serif'; c.fillStyle = '#9a92a8'; c.textBaseline = 'middle';
+  c.strokeStyle = '#eee8f5'; c.lineWidth = 1;
+  for (const [ms, lab] of [[100, '0,1 s'], [300, '0,3 s'], [1000, '1 s'], [3000, '3 s'], [10000, '10 s']]) {
+    const y = Math.round(Y(ms)) + .5; c.beginPath(); c.moveTo(pl, y); c.lineTo(w - pr, y); c.stroke(); c.textAlign = 'right'; c.fillText(lab, pl - 6, y); }
+  c.textAlign = 'center'; c.textBaseline = 'alphabetic';
+  for (let t = 0; t <= X1; t += 30) c.fillText(Arena.clock(t), Math.min(w - 16, Math.max(pl + 10, X(t))), h - 4);
+  // courbe de chute complète
+  c.strokeStyle = '#8c8698'; c.lineWidth = 1.6; c.setLineDash([5, 4]); c.beginPath();
+  for (let i = 0; i <= 240; i++) { const t = X1 * i / 240, y = Y(fallTime(t * 1000, FULL_TICKS)); i ? c.lineTo(X(t), y) : c.moveTo(X(t), y); }
+  c.stroke(); c.setLineDash([]);
+  // curseur « maintenant »
+  if (RUNNING || FINISHED) { const xn = Math.round(X(elNow() / 1000)) + .5; c.strokeStyle = 'rgba(123,63,242,.35)'; c.beginPath(); c.moveTo(xn, pt); c.lineTo(xn, h - pb); c.stroke(); }
+  // décisions
+  const col = L.id === 'jev' ? '#d63fae' : '#d97757';
+  for (const d of L.log) {
+    const x = X(d.t), y = d.choice ? Y(d.rtt) : Y(12000);
+    c.fillStyle = !d.choice ? '#e5484d' : d.onTime ? col : '#e5484d';
+    c.globalAlpha = d.onTime ? .9 : .85;
+    if (!d.choice) { c.font = '700 13px system-ui'; c.textAlign = 'center'; c.fillText('×', x, y + 4); }
+    else { c.beginPath(); c.arc(x, y, 3.6, 0, 7); c.fill(); }
+  }
+  c.globalAlpha = 1;
+  // requêtes encore en vol : petit trait qui monte avec le temps d'attente
+  if (L.p && L.p.req && !L.p.decided && !L.over && RUNNING) {
+    const x = X(L.p.tSpawn / 1000), y = Y(Math.max(100, now() - L.p.t0));
+    c.strokeStyle = col; c.globalAlpha = .45; c.lineWidth = 2; c.beginPath(); c.moveTo(x, Y(100)); c.lineTo(x, y); c.stroke(); c.globalAlpha = 1;
+  }
+}
+
+function updateLaneUI(L) {
+  const u = L.ui;
+  Arena.set(u.lines, String(L.lines)); Arena.set(u.pieces, String(L.pieces)); Arena.set(u.dec, String(L.answered));
+  Arena.set(u.missed, String(L.missed), 'v missed' + (L.missed ? ' bad' : ''));
+  u.cost.textContent = Arena.usd(L.cost, L.cost >= 0.01 ? 3 : 5);
+  u.traps.innerHTML = `${L.q.trap}<small>/ ${L.q.n}</small>`;
+  const p = L.p;
+  if (L.over) { u.pc.textContent = `pièce ${L.idx}`; u.state.textContent = 'partie terminée'; u.state.className = 'state bad'; u.bar.style.width = '0'; u.nl.textContent = ''; u.nr.textContent = ''; return; }
+  if (!p || !RUNNING) return;
+  const inq = Math.max(0, L.inflight - (p.req && !p.decided && !p.errored && !p.blocked ? 1 : 0));
+  u.pc.innerHTML = `pièce <b>${p.id}</b> · ${p.kind}` + (inq ? ` · <span style="color:var(--short)">${inq} réponse${inq > 1 ? 's' : ''} en retard encore en route</span>` : '');
+  const elapsed = now() - p.t0, budget = Math.max(1, p.budget);
+  if (p.decided) {
+    u.state.textContent = `décidé en ${Arena.ms(p.rtt)}`; u.state.className = 'state okk';
+    u.bar.className = ''; u.bar.style.width = Math.min(100, p.rtt / budget * 100) + '%';
+    u.nl.textContent = 'avant l\'atterrissage'; u.nr.innerHTML = `marge <b>${sec(budget - p.rtt)}</b>`;
+  } else if (p.noreq || p.errored || p.blocked) {
+    u.state.textContent = p.noreq ? 'pas de requête' : p.errored ? 'réponse invalide' : 'trop tard : pièce trop basse'; u.state.className = 'state bad';
+    u.bar.className = 'bad'; u.bar.style.width = Math.min(100, elapsed / budget * 100) + '%';
+    u.nl.textContent = p.noreq || ''; u.nr.innerHTML = `pose dans <b>${sec(Math.max(0, budget - elapsed))}</b>`;
+  } else {
+    u.state.textContent = 'réflexion…'; u.state.className = 'state';
+    u.bar.className = ''; u.bar.style.width = Math.min(100, elapsed / budget * 100) + '%';
+    u.nl.innerHTML = `réflexion <b>${sec(elapsed)}</b>`; u.nr.innerHTML = `atterrissage dans <b>${sec(Math.max(0, budget - elapsed))}</b>`;
+  }
+}
+
+function updateTop() {
+  const el = elNow(), g = gravityMs(el);
+  $('#clk').textContent = Arena.clock(el / 1000);
+  $('#lvl').textContent = levelAt(el);
+  $('#spd').textContent = (g >= 10 ? Math.round(g) : g.toFixed(1).replace('.', ',')) + ' ms';
+  $('#fall').textContent = sec(fallTime(el, FULL_TICKS), 1);
+  const rc = $('#racecost'); if (rc) { const c = raceCost(); rc.textContent = Arena.usd(c, c >= 0.01 ? 3 : 5); }
+}
+
+// =====================================================================================================
+// Boucles : logique toutes les ~4 ms, dessin à chaque image
+// =====================================================================================================
+let lastT = 0, lastDraw = 0, lastTl = 0;
+function logic() {
+  if (!RUNNING) return;
+  const t = now(), el = t - T_START, dt = Math.min(250, t - lastT); lastT = t;
+  const g = gravityMs(el);
+  for (const L of LS) stepTetris(L, dt, g);
+  if (LS.every(L => L.over) || el / 1000 >= MAXSEC) { finish(); return; }
+  setTimeout(logic, 4);
+}
+function render(t) {
+  const dt = lastDraw ? Math.min(100, t - lastDraw) : 16; lastDraw = t;
+  for (const L of LS) { drawBoard(L, dt); updateLaneUI(L); }
+  if (t - lastTl > 90) { lastTl = t; for (const L of LS) drawTimeline(L); }
+  updateTop();
+  requestAnimationFrame(render);
+}
+
+function statsOf(L) {
+  const alive = (L.over ? L.tOver : elNow() / 1000) || 1e-9;
+  return {lane: L.id, model: Arena.NAMES[L.id], lines: L.lines, pieces: L.pieces, missed: L.missed, late_answers: L.late, answered: L.answered,
+    errors: L.errors, skipped: L.skipped, survived_s: +alive.toFixed(2), game_over: L.over, cause: L.cause,
+    rtt_p50: pct(L.rtt, .5), rtt_p95: pct(L.rtt, .95), rtt_avg: avg(L.rtt), rtt_min: L.rtt.length ? Math.min(...L.rtt) : null,
+    rtt_max: L.rtt.length ? Math.max(...L.rtt) : null, upstream_p50: pct(L.lat, .5), requests: L.rtt.length,
+    cost_usd: +L.cost.toFixed(6), cost_per_decision: L.rtt.length ? +(L.cost / L.rtt.length).toFixed(6) : null, quality: L.q,
+    first_miss_s: (L.pieceLog.find(x => !x.decided) || {}).t_lock ?? null};
+}
+
+async function finish() {
+  RUNNING = false; FINISHED = true;
+  const el = now() - T_START;
+  for (const L of LS) if (!L.over) { L.tOver = el / 1000; L.cause = 'fin du chrono'; }
+  const lanes = LS.map(statsOf);
+  const res = {game: 'tetris', seed: SEED, lanes, params: {G0, HOLD, LEVELSEC, SPEEDUP, GMIN, KOPT, MAXSEC, MAXINFLIGHT, STATE_FULL},
+    duration_s: +(el / 1000).toFixed(2), started_at: new Date(Date.now() - el).toISOString(),
+    logs: Object.fromEntries(LS.map(L => [L.id, L.log])), pieces: Object.fromEntries(LS.map(L => [L.id, L.pieceLog]))};
+  window.__result = res;
+  showResult(res);
+  const name = NAME || ('course_' + new Date().toISOString().slice(0, 19).replace(/[-:]/g, '').replace('T', '_') + '_g' + SEED);
+  try { const r = await fetch('/api/tetris/save', {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({name, data: res})}); res.saved = (await r.json()).path; } catch (e) {}
+  window.__done = true;
+}
+
+function showResult(res) {
+  const [j, o] = res.lanes;
+  const winner = j.lines !== o.lines ? (j.lines > o.lines ? 'jev' : 'opus') : (j.survived_s !== o.survived_s ? (j.survived_s > o.survived_s ? 'jev' : 'opus') : null);
+  const nm = (id) => `<span style="color:var(--${id})">${Arena.NAMES[id]}</span>`;
+  const verdict = winner ? `${nm(winner)} gagne : ${res.lanes.find(s => s.lane === winner).lines} lignes contre ${res.lanes.find(s => s.lane !== winner).lines}` : 'Égalité parfaite';
+  const rows = [
+    ['Lignes effacées', s => s.lines, 'max'],
+    ['Survie', s => sec(s.survived_s * 1000), 'max', s => s.survived_s],
+    ['Pièces posées', s => s.pieces, 'max'],
+    ['Décisions reçues', s => s.answered, null],
+    ['Décisions ratées', s => s.missed, 'min'],
+    ['Première décision ratée', s => s.first_miss_s == null ? 'aucune' : Arena.clock(s.first_miss_s), 'max', s => s.first_miss_s == null ? 1e9 : s.first_miss_s],
+    ['Pièges choisis', s => `${s.quality.trap} / ${s.quality.n}`, 'min', s => s.quality.n ? s.quality.trap / s.quality.n : 0],
+    ['Temps de décision médian', s => Arena.ms(s.rtt_p50), 'min', s => s.rtt_p50],
+    ['Coût réel de la course', s => Arena.usd(s.cost_usd, s.cost_usd >= 0.01 ? 3 : 5), 'min', s => s.cost_usd],
+    ['Coût par décision', s => Arena.usd(s.cost_per_decision, 6), 'min', s => s.cost_per_decision],
+  ];
+  const body = rows.map(([lab, f, best, key]) => {
+    const k = key || f; const a = k(j), b = k(o);
+    const wj = best && a !== b && (best === 'max' ? a > b : a < b), wo = best && a !== b && !wj;
+    return `<tr><td>${lab}</td><td class="jev ${wj ? 'win' : ''}">${f(j)}</td><td class="opus ${wo ? 'win' : ''}">${f(o)}</td></tr>`; }).join('');
+  $('#result').innerHTML = `<h2>Résultat · Tetris · graine ${res.seed}</h2><div class="verdict">${verdict}</div>
+    <table><tr><th></th><th class="jev"><img src="${Arena.LOGOS.jev}" alt=""><span class="nm">Jev</span></th><th class="opus"><img src="${Arena.LOGOS.opus}" alt=""><span class="nm">Claude Opus 5.5</span></th></tr>${body}</table>
+    <div class="bottom"><div class="foot">Mêmes pièces dans le même ordre, mêmes règles : ${G0} ms par ligne${HOLD ? ` pendant ${HOLD} s` : ' au départ'}, puis ×${String(SPEEDUP).replace('.', ',')} toutes les ${LEVELSEC} s.
+    Chaque décision est une vraie requête OpenRouter ; le jeu calcule les placements possibles et le modèle choisit parmi ${KOPT} options (A-${'ABCDEFGHIJ'[KOPT - 1]}).
+    Fin : ${sec(res.duration_s * 1000)}.</div><button class="go light" id="again">Nouvelle course</button></div>`;
+  $('#again').onclick = () => location.reload();
+  $('#veil').classList.add('show'); $('#result').classList.add('show'); $('#stage').classList.remove('running');
+}
+
+function start() {
+  if (RUNNING || FINISHED || !READY) return;
+  $('#hint').style.display = 'none'; $('#stage').classList.add('running');
+  if (document.activeElement && document.activeElement.blur) document.activeElement.blur();
+  T_START = now(); lastT = T_START; RUNNING = true;
+  if (WS_OK) WS.send({cmd: 'start', meta: {seed: SEED, params: {G0, HOLD, LEVELSEC, SPEEDUP, GMIN, KOPT, MAXSEC, MAXINFLIGHT}, lanes: LANES, page: PAGE}});
+  for (const L of LS) spawn(L);     // les deux premières requêtes partent au même instant
+  logic();
+}
+
+// En haut à droite : coût de CETTE course seulement (part de 0 à chaque course, préchauffage exclu)
+function raceCost() { return LS.reduce((a, L) => a + L.cost, 0); }
+
+// =====================================================================================================
+// Démarrage : préchauffage (une vraie décision par modèle, hors stats), puis Espace
+// =====================================================================================================
+async function boot() {
+  for (const id of LANES) LS.push(newLane(id));
+  await (document.fonts ? document.fonts.ready : Promise.resolve());
+  fitStage(); addEventListener('resize', fitStage);
+  $('#topmeta').innerHTML = `graine ${SEED} · décisions en direct via OpenRouter<br>coût de cette course : <b id="racecost">${Arena.usd(0, 5)}</b>`;
+  updateTop(); requestAnimationFrame(render);
+  // attendre le WebSocket (2 s max), sinon repli HTTP
+  for (let i = 0; i < 40 && !WS_OK; i++) await new Promise(r => setTimeout(r, 50));
+  // Une vraie question Tetris (pièce T sur plateau vide). Une question « bidon » de préchauffage déclenchait
+  // le filtre de sécurité d'Anthropic (refus « cyber », mesuré le 12/10).
+  const wd = buildTetrisDecision(emptyBoard(), 'T', 'I', 1, 'warmup:' + SEED);
+  const warm = await Promise.all(LANES.map(l => decideRemote(l, wd.state, wd.questions, 'tetris-warmup')));
+  // Le préchauffage n'entre dans aucun compteur ; on n'affiche que l'état des connexions (et une vraie erreur s'il y en a)
+  const bad = warm.map((d, i) => d.ok ? null : `${Arena.NAMES[LANES[i]]} : ${frErr(d.error || 'pas de réponse')}`).filter(Boolean);
+  READY = true; window.__ready = true; window.__start = start;
+  $('#hint').innerHTML = `<div class="a">Tetris · Jev contre Claude Opus 5.5</div>
+    <div class="b">Les deux modèles reçoivent les mêmes pièces. ${HOLD ? `Chute lente pendant ${HOLD} s, puis elle` : 'La chute'} accélère toutes les ${LEVELSEC} s.<br>Si la réponse arrive après l'atterrissage, la pièce tombe là où elle est apparue.</div>
+    <button class="go" id="go">Lancer la course</button>
+    <div class="c">${bad.length ? '<span style="color:#ff8f93">Connexion en erreur · ' + bad.join(' · ') + '</span>' : 'Jev et Claude Opus 5.5 sont connectés · ou <kbd>Espace</kbd>'}</div>`;
+  $('#go').onclick = () => start();
+  if (AUTO) setTimeout(start, +(P.get('delay') || 1200));
+}
+addEventListener('keydown', (e) => {
+  if (e.code === 'Space') { e.preventDefault(); start(); }
+  else if (e.code === 'KeyR' && FINISHED) location.reload();
+});
+boot();
+</script>
+</body>
+</html>
