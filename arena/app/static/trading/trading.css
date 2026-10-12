@@ -113,3 +113,9 @@ kbd { font: inherit; font-size: 12px; background: var(--paper-2); border-radius:
 .final .close { margin-top: 20px; display: flex; justify-content: flex-end; gap: 10px; }
 .legend .l-band { background: linear-gradient(90deg, rgba(229,72,77,.6), rgba(18,161,80,.6)); height: 2px; width: 16px; }
 .legend .l-vol { background: rgba(123,63,242,.18); border: 1px solid rgba(123,63,242,.35); }
+/* barre du haut : tout sur une ligne, meme sans la police SF Pro */
+.topbar .btn { white-space: nowrap; }
+.topbar .home { white-space: nowrap; }
+.controls select { max-width: 140px; }
+.controls #cSymbol { width: 84px; }
+.controls #cPreset { max-width: 120px; }
