@@ -1,6 +1,9 @@
-# Jev Arena : Jev (TypeSafe) contre Claude Opus 5.5, en direct.
-# Lancer : docker compose up -d --build   puis http://127.0.0.1:8800
-name: jev-arena
+# Jev Arena · version a trois : Jev (TypeSafe), Laya (open source) et Claude Opus 5.5.
+# Lancer : docker compose up -d --build   puis http://127.0.0.1:8810
+# Par defaut, Laya passe par sa demo gratuite sur Hugging Face (aucun GPU, rien a telecharger).
+# Laya sur ton PC : COMPOSE_PROFILES=laya-local (carte NVIDIA) ou laya-cpu (sans GPU) dans .env, voir README.
+# Autre nom de projet et autres ports que l'arene a deux (8800) : les deux peuvent tourner en meme temps.
+name: jev-arena-laya
 
 services:
   arena:
@@ -10,10 +13,9 @@ services:
       ARENA_DATA: /data
       TZ: Europe/Paris
       CRAWL4AI_URL: http://crawl4ai:11235
+      LAYA_BACKEND: ${LAYA_BACKEND:-hosted}   # hosted = demo Hugging Face, local = conteneur laya ci-dessous
     ports:
-      - "127.0.0.1:8800:8800"
-      # instances de test sans rechargement, une par scene (voir ARENA_DEV.md)
-      - "127.0.0.1:8801-8804:8801-8804"
+      - "127.0.0.1:8810:8800"
     volumes:
       - ./arena/app:/srv/app      # code monte en direct (rechargement automatique)
       - ./data:/data              # sessions enregistrees, ledger des couts
@@ -24,6 +26,42 @@ services:
       - crawl4ai
     restart: unless-stopped
 
+  # Laya en local sur une carte NVIDIA (profil laya-local). Image ~9 Go, modeles ~2,3 Go au premier demarrage.
+  laya:
+    profiles: ["laya-local"]
+    build: ./laya
+    environment:
+      LAYA_HOST: 0.0.0.0
+      LAYA_PORT: "8000"
+      LAYA_DEVICE: ${LAYA_DEVICE:-cuda}
+      LAYA_PRELOAD: "1"
+    gpus: all
+    volumes:
+      - laya-models:/models
+    ports:
+      - "127.0.0.1:8820:8000"     # pour tester Laya directement (curl / PowerShell)
+    restart: unless-stopped
+
+  # Laya en local sans carte graphique (profil laya-cpu) : PyTorch CPU, marche aussi sur Mac. Plus lent.
+  laya-cpu:
+    profiles: ["laya-cpu"]
+    build:
+      context: ./laya
+      dockerfile: Dockerfile.cpu
+    environment:
+      LAYA_HOST: 0.0.0.0
+      LAYA_PORT: "8000"
+      LAYA_DEVICE: cpu
+      LAYA_PRELOAD: "1"
+    networks:
+      default:
+        aliases: [laya]           # meme adresse que le conteneur GPU : http://laya:8000
+    volumes:
+      - laya-models:/models
+    ports:
+      - "127.0.0.1:8820:8000"
+    restart: unless-stopped
+
   crawl4ai:
     image: unclecode/crawl4ai:latest
     env_file: .env
@@ -31,3 +69,6 @@ services:
     expose:
       - "11235"
     restart: unless-stopped
+
+volumes:
+  laya-models:

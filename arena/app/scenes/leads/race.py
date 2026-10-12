@@ -1,10 +1,10 @@
-"""La course aux leads, en vrai.
+"""La course aux leads, en vrai, a trois : Jev, Laya et Claude Opus 5.5.
 
 Une source partagee (recherche GitHub -> scraper GitHub de Scout -> page d'accueil lue par Lightpanda, Crawl4AI en
-secours) remplit deux files identiques, une par modele. Chaque file est videe par le MEME nombre d'ouvriers (conc).
+secours) remplit trois files identiques, une par modele. Chaque file est videe par le MEME nombre d'ouvriers (conc).
 Pour chaque lead et chaque modele : 1 decision « quel lien ouvrir pour trouver un email » -> le lecteur partage
-ouvre la page choisie (une seule visite si les deux choisissent la meme) -> 1 decision de qualification.
-Rien n'est ralenti ni accelere : Jev attend le web, Opus fait attendre sa file.
+ouvre la page choisie (une seule visite si plusieurs choisissent la meme) -> 1 decision de qualification.
+Rien n'est ralenti ni accelere : Jev et Laya attendent le web, Opus fait attendre sa file.
 """
 import asyncio
 import logging
@@ -15,7 +15,7 @@ from collections import deque
 from urllib.parse import urlparse
 
 from ...core.deciders import client as or_client
-from ...core.deciders import decide, top_choice
+from ...core.deciders import decide, laya_decide, top_choice
 from ...core.hub import HUB
 from ...core.ledger import LEDGER_OBJ, BudgetExceeded
 from .questions import QUAL_Q, STAGES, link_question, link_state, pick_candidates, qual_state
@@ -25,7 +25,8 @@ from .web import Fetcher, attributable, valid_email
 log = logging.getLogger("leads")
 
 SCENE = "leads"
-MODELS = ("jev", "opus")
+MODELS = ("jev", "laya", "opus")
+PAIRS = (("jev", "opus"), ("jev", "laya"), ("laya", "opus"))
 PROFILE_WORKERS = 8
 HOME_WORKERS = 16
 ROWS_KEPT = 14
@@ -83,7 +84,10 @@ class Race:
                      "github_pause": 0, "search_requests": 0, "rate_remaining": None, "exhausted": False}
         self.feed: deque = deque(maxlen=FEED_KEPT)
         self.leads: dict[int, dict] = {}
-        self.agree = {"n": 0, "verdict": 0, "stage": 0, "prio": 0, "link_n": 0, "link": 0}
+        self.agree = {f"{a}-{b}": {"n": 0, "verdict": 0, "stage": 0, "prio": 0, "link_n": 0, "link": 0}
+                      for a, b in PAIRS}
+        self.agree_done: set = set()          # (paire, lead) deja comptes
+        self.all3 = {"n": 0, "same": 0}       # leads juges par les trois : meme verdict partout ?
         self.agree_flags: dict[int, bool] = {}
         self.disagreements: list[dict] = []
         self.t0 = None
@@ -108,15 +112,12 @@ class Race:
 
     def stats(self) -> dict:
         led = LEDGER_OBJ.summary().get(SCENE, {})
-        a = self.agree
         return {"phase": self.phase, "elapsed": self.el() if self.phase == "running" else self._end_elapsed(),
                 "target": self.target, "conc": self.conc,
                 "pipe": {**self.pipe, "fetch": dict(self.fetcher.stats) if self.fetcher else {},
                          "source_done": self.t_source_done},
                 "models": {m: s.stats() for m, s in self.sides.items()},
-                "agree": {"n": a["n"], "verdict": (a["verdict"] / a["n"]) if a["n"] else None,
-                          "stage": (a["stage"] / a["n"]) if a["n"] else None,
-                          "link": (a["link"] / a["link_n"]) if a["link_n"] else None},
+                "agree": self._agree_stats(),
                 "budget": {"spent": led.get("spent", 0.0), "cap": LEDGER_OBJ.cap(SCENE)}}
 
     def _end_elapsed(self):
@@ -199,10 +200,12 @@ class Race:
             await self.search.close()
 
     async def _warm(self):
-        """Ouvre les connexions TLS vers OpenRouter (requetes gratuites) : la 1re decision n'est pas penalisee."""
+        """Ouvre les connexions TLS vers OpenRouter (requetes gratuites) et reveille Laya (decision gratuite, hors
+        compteurs) : la 1re decision d'aucun modele n'est penalisee."""
+        q = {"x": {"type": "choice", "instructions": "Is `n` positive?", "criteria": {"yes": "n > 0", "no": "n <= 0"}}}
         try:
             await asyncio.gather(*(or_client().head("https://openrouter.ai/") for _ in range(4)),
-                                 return_exceptions=True)
+                                 laya_decide("warmup", {"n": 1}, q), return_exceptions=True)
         except Exception:
             pass
 
@@ -347,7 +350,7 @@ class Race:
     async def _dispatch(self, lead: dict):
         self.pipe["dispatched"] += 1
         self.leads[lead["id"]] = lead
-        for side in self.sides.values():  # les deux files recoivent le lead au meme instant
+        for side in self.sides.values():  # les trois files recoivent le lead au meme instant
             side.queued += 1
             side.q.put_nowait(lead)
         await self.emit({
@@ -479,26 +482,56 @@ class Race:
         await self.emit({"type": "lead_done", "row": row})
         await self._check_agreement(lead["id"])
 
+    def _agree_stats(self) -> dict:
+        out = {}
+        for key, a in self.agree.items():
+            out[key] = {"n": a["n"], "verdict": (a["verdict"] / a["n"]) if a["n"] else None,
+                        "stage": (a["stage"] / a["n"]) if a["n"] else None,
+                        "priority": (a["prio"] / a["n"]) if a["n"] else None,
+                        "link": (a["link"] / a["link_n"]) if a["link_n"] else None, "link_n": a["link_n"]}
+        n = self.all3["n"]
+        out["all3"] = {"n": n, "verdict": (self.all3["same"] / n) if n else None}
+        return out
+
     async def _check_agreement(self, lid: int):
-        a, b = self.sides["jev"].results.get(lid), self.sides["opus"].results.get(lid)
-        if not a or not b or a.get("verdict") is None or b.get("verdict") is None:
-            return
-        same = a["verdict"] == b["verdict"]
-        self.agree["n"] += 1
-        self.agree["verdict"] += int(same)
-        self.agree["stage"] += int(a.get("stage") == b.get("stage"))
-        self.agree["prio"] += int(a.get("priority") == b.get("priority"))
-        la, lb = (a.get("link") or {}).get("key"), (b.get("link") or {}).get("key")
-        if la and lb:
-            self.agree["link_n"] += 1
-            self.agree["link"] += int(la == lb)
-        self.agree_flags[lid] = same
-        if not same:
-            self.disagreements.append({
-                "lead": lid, "host": a["host"], "email": a.get("email") or b.get("email"),
-                "jev": {"fit": a["fit"], "stage": a["stage"], "priority": a["priority"]},
-                "opus": {"fit": b["fit"], "stage": b["stage"], "priority": b["priority"]}})
-        await self.emit({"type": "agree", "lead": lid, "agree": same, "stage_agree": a.get("stage") == b.get("stage")})
+        res = {m: self.sides[m].results.get(lid) for m in MODELS}
+        for a, b in PAIRS:
+            key = f"{a}-{b}"
+            ra, rb = res[a], res[b]
+            if (key, lid) in self.agree_done or not ra or not rb or ra.get("verdict") is None or rb.get("verdict") is None:
+                continue
+            self.agree_done.add((key, lid))
+            ag = self.agree[key]
+            same = ra["verdict"] == rb["verdict"]
+            ag["n"] += 1
+            ag["verdict"] += int(same)
+            ag["stage"] += int(ra.get("stage") == rb.get("stage"))
+            ag["prio"] += int(ra.get("priority") == rb.get("priority"))
+            la, lb = (ra.get("link") or {}).get("key"), (rb.get("link") or {}).get("key")
+            if la and lb:
+                ag["link_n"] += 1
+                ag["link"] += int(la == lb)
+            if not same and self.agree_flags.get(lid) is not False:
+                self.agree_flags[lid] = False
+                await self.emit({"type": "agree", "lead": lid, "agree": False, "pair": key})
+        # les trois ont repondu : meme verdict partout ?
+        if all(res.values()) and ("all3", lid) not in self.agree_done:
+            judged = {m: r for m, r in res.items() if r.get("verdict") is not None}
+            if len(judged) == len(MODELS):
+                self.agree_done.add(("all3", lid))
+                same = len({r["verdict"] for r in judged.values()}) == 1
+                self.all3["n"] += 1
+                self.all3["same"] += int(same)
+                if same:
+                    self.agree_flags[lid] = True
+                    await self.emit({"type": "agree", "lead": lid, "agree": True})
+                else:
+                    any_r = next(iter(judged.values()))
+                    self.disagreements.append({
+                        "lead": lid, "host": any_r["host"],
+                        "email": next((r.get("email") for r in judged.values() if r.get("email")), None),
+                        **{m: {"fit": r["fit"], "stage": r["stage"], "priority": r["priority"]}
+                           for m, r in judged.items()}})
 
     # ------------------------------------------------------------------ bilan
     def _summary(self) -> dict:
@@ -516,11 +549,7 @@ class Race:
                 if r.get("stage"):
                     st["stages"][r["stage"]] = st["stages"].get(r["stage"], 0) + 1
             out["models"][m] = st
-        a = self.agree
-        out["agreement"] = {"n": a["n"], "verdict": (a["verdict"] / a["n"]) if a["n"] else None,
-                            "stage": (a["stage"] / a["n"]) if a["n"] else None,
-                            "priority": (a["prio"] / a["n"]) if a["n"] else None,
-                            "link": (a["link"] / a["link_n"]) if a["link_n"] else None, "link_n": a["link_n"]}
+        out["agreement"] = self._agree_stats()
         out["disagreements"] = self.disagreements[:40]
         j, o = out["models"]["jev"], out["models"]["opus"]
         out["ratio"] = {"time": (o["time_s"] / j["time_s"]) if j["time_s"] else None,

@@ -119,3 +119,32 @@ kbd { font: inherit; font-size: 12px; background: var(--paper-2); border-radius:
 .controls select { max-width: 140px; }
 .controls #cSymbol { width: 84px; }
 .controls #cPreset { max-width: 120px; }
+
+/* ================================================================ version a trois : Jev · Laya · Opus (1920 px de large) */
+.duel.three { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; padding: 14px 18px 0; }
+.three .fund { padding: 14px 16px 12px; gap: 8px; }
+.fund.laya { border-top: 5px solid var(--laya); }
+.three .fhead { gap: 12px; }
+.three .fhead .model-head img { width: 44px; height: 44px; }
+.three .fhead .model-head .name { font-size: 25px; }
+.three .fhead .model-head .maker { font-size: 13px; }
+.three .pos-badge { font-size: 17px; min-width: 104px; }
+.three .pnl { min-width: 120px; }
+.three .pnl .value { font-size: 28px; }
+.three .drow { font-size: 14.5px; height: 26px; }
+.three .plan { font-size: 14px; gap: 10px; height: 30px; padding: 0 10px; }
+.three .plan-count { min-width: 118px; }
+.three .chart { min-height: 240px; }
+.three .tape-label { width: 74px; font-size: 11px; }
+.three .legend { font-size: 11px; gap: 4px; }
+.three .legend i { margin-left: 5px; }
+.three .grid { gap: 6px 10px; }
+.three .grid .stat .label { font-size: 10.5px; white-space: nowrap; }
+.three .grid .stat .value { font-size: 20px; white-space: nowrap; }
+.three .trades { min-height: 92px; }
+.three .trow { grid-template-columns: 56px 1fr 74px 92px 44px; gap: 8px; font-size: 13px; padding: 3px 8px; }
+.three .otoast { top: 112px; font-size: 13.5px; right: 14px; }
+.overlay h2 .laya { color: var(--laya); }
+.final.three-final { width: 1460px; }
+.final.three-final .cols { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 26px; }
+.controls #cLaya { max-width: 150px; }

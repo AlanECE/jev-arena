@@ -1,14 +1,19 @@
-"""Scene « La course aux 100 leads » : Jev contre Opus sur le meme flux de vrais leads (GitHub + Scout,
-Lightpanda / Crawl4AI). Page : /leads. API : /api/leads/... (state, start, reset, forget, summary)."""
+"""Scene « La course aux 100 leads » : Jev, Laya et Opus sur le meme flux de vrais leads (GitHub + Scout,
+Lightpanda / Crawl4AI). Page : /leads. API : /api/leads/... (state, start, reset, forget, summary, export, linkedin)."""
 import asyncio
+import re
 
+import httpx
 from fastapi import APIRouter
 
+from ...core.config import GITHUB_TOKEN
 from ...core.hub import SceneBase
 from ...core.ledger import LEDGER_OBJ
 from .questions import STAGES
 from .race import SCENE, Race
 from .scout import SeenStore
+
+GH_HEADERS = {"Accept": "application/vnd.github+json", **({"Authorization": f"Bearer {GITHUB_TOKEN}"} if GITHUB_TOKEN else {})}
 
 TARGETS = (5, 10, 25, 50, 100)
 CONCS = (4, 8, 12, 16)
@@ -27,6 +32,9 @@ class LeadsScene(SceneBase):
 
     async def shutdown(self):
         await self._stop()
+
+    def busy(self) -> bool:
+        return bool(self.task and not self.task.done())
 
     async def _stop(self):
         if self.task and not self.task.done():
@@ -124,3 +132,66 @@ async def forget():
 @router.get("/summary")
 async def summary():
     return (scene.race.summary if scene.race else None) or {}
+
+
+# ------------------------------------------------------------------ export Excel (bouton de la page)
+LEAD_KEYS = ("id", "username", "name", "host", "url", "title", "query", "signals", "tool", "t_ready")
+
+
+@router.get("/export")
+async def export():
+    """Toute la derniere course (en cours ou finie) : leads, reponse de chaque modele, bilan. Donnees non masquees :
+    le classeur sert a Alan pour prospecter, il ne doit pas etre publie."""
+    r = scene.race
+    if r is None:
+        return {"leads": {}, "results": {}, "summary": None}
+    leads = {lid: {**{k: L.get(k) for k in LEAD_KEYS}, "state": L.get("qual_state")} for lid, L in r.leads.items()}
+    return {"t0": r.t0, "phase": r.phase, "models": list(r.sides), "leads": leads,
+            "results": {m: s.results for m, s in r.sides.items()}, "agree_flags": r.agree_flags,
+            "summary": r.summary, "stats": r.stats()}
+
+
+LI_RE = re.compile(r"https?://(?:[a-z]{2,3}\.)?linkedin\.com/(?:in|company)/[A-Za-z0-9_%\-.]+/?", re.I)
+
+
+async def _linkedin_github(cli: httpx.AsyncClient, username: str):
+    try:
+        r = await cli.get(f"https://api.github.com/users/{username}/social_accounts", headers=GH_HEADERS, timeout=10)
+        if r.status_code == 200:
+            for a in r.json():
+                if a.get("provider") == "linkedin" or "linkedin.com" in (a.get("url") or ""):
+                    return a["url"], "profil GitHub"
+    except Exception:
+        pass
+    return None
+
+
+async def _linkedin_site(cli: httpx.AsyncClient, host: str):
+    for url in (f"https://{host}/", f"http://{host}/"):
+        try:
+            r = await cli.get(url, timeout=8, follow_redirects=True, headers={"User-Agent": "Mozilla/5.0"})
+            found = [u for u in LI_RE.findall(r.text) if not re.search(r"linkedin\.com/(company/linkedin|in/share)", u, re.I)]
+            return (found[0].rstrip("/"), "site") if found else None
+        except Exception:
+            continue
+    return None
+
+
+@router.post("/linkedin")
+async def linkedin(body: dict):
+    """LinkedIn de chaque lead : reseaux declares sur le profil GitHub, sinon lien linkedin.com trouve sur le site."""
+    items = (body or {}).get("items") or []
+    sem = asyncio.Semaphore(12)
+    found = {}
+    async with httpx.AsyncClient() as cli:
+        async def one(it):
+            async with sem:
+                res = None
+                if it.get("username"):
+                    res = await _linkedin_github(cli, it["username"])
+                if not res and it.get("host"):
+                    res = await _linkedin_site(cli, it["host"])
+                if res:
+                    found[str(it.get("id"))] = {"url": res[0], "src": res[1]}
+        await asyncio.gather(*(one(it) for it in items[:300]))
+    return {"found": found, "checked": min(len(items), 300)}

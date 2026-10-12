@@ -3,13 +3,15 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Jev Arena</title>
+<title>Jev Arena · Jev, Laya, Opus</title>
 <link rel="stylesheet" href="/static/common/arena.css">
 <style>
   body { overflow: auto; }
   main { max-width: 1240px; margin: 0 auto; padding: 56px 28px; }
   h1 { font-size: 64px; margin: 0; letter-spacing: -.02em; }
-  h1 .jev { color: var(--jev); } h1 .opus { color: var(--opus); }
+  h1 .jev { color: var(--jev); } h1 .opus { color: var(--opus); } h1 .laya { color: var(--laya); }
+  a.scene.wide { grid-column: 1 / -1; }
+  a.scene.small h2 { font-size: 24px; }
   .sub { color: var(--ink-2); font-size: 22px; margin: 12px 0 40px; }
   .grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 22px; }
   a.scene { display: block; padding: 28px; text-decoration: none; color: inherit; transition: transform .2s; }
@@ -25,18 +27,20 @@
 </head>
 <body>
 <main>
-  <div class="duo"><img src="/static/common/logos/typesafe-icon.png" alt=""><span class="vs">contre</span><img src="/static/common/logos/claude.png" alt=""></div>
-  <h1><span class="jev">Jev</span> contre <span class="opus">Claude Opus 5.5</span></h1>
-  <p class="sub">Quatre épreuves en direct. Chaque décision part pour de vrai chez TypeSafe ou chez Anthropic.</p>
+  <div class="duo"><img src="/static/common/logos/typesafe-icon.png" alt=""><img src="/static/common/logos/laya.png" alt=""><img src="/static/common/logos/claude.png" alt=""></div>
+  <h1><span class="jev">Jev</span>, <span class="laya">Laya</span> et <span class="opus">Claude Opus 5.5</span></h1>
+  <p class="sub">Les mêmes épreuves, avec Laya en plus : le modèle de décision open source, sur ta carte graphique ou hébergé gratuitement.</p>
   <div class="grid">
-    <a class="scene card" href="/trading"><div class="k">01 · Trading</div><h2>Scalping en direct</h2>
-      <p>Deux fonds sur Alpaca (compte paper). Les bougies arrivent chaque seconde, chacun décide long, short ou rien.</p></a>
-    <a class="scene card" href="/tetris"><div class="k">02 · Tetris</div><h2>Qui tient le rythme ?</h2>
-      <p>Mêmes pièces, chute de plus en plus rapide. Une décision qui arrive trop tard, et la pièce tombe n'importe où.</p></a>
-    <a class="scene card" href="/leads"><div class="k">03 · Prospection</div><h2>La course aux 100 leads</h2>
-      <p>Scout trouve les profils, Lightpanda lit les sites, chaque modèle juge si le lead a besoin d'une vidéo de lancement.</p></a>
-    <a class="scene card" href="/avis"><div class="k">04 · Avis clients</div><h2>Le tri en direct</h2>
-      <p>De vrais avis arrivent à la chaîne. Chacun devine la note et le sujet, et la vraie note du client tranche.</p></a>
+    <a class="scene card" href="/trading"><div class="k">Trading · à trois</div><h2>Scalping en direct</h2>
+      <p>Trois fonds sur le bitcoin, une bougie par seconde. Même stratégie, même courtier simulé : seule la décision d'entrée change.</p></a>
+    <a class="scene card" href="/leads"><div class="k">Prospection · à trois</div><h2>La course aux leads</h2>
+      <p>Scout trouve les profils, Lightpanda lit les sites, Jev, Laya et Opus jugent les mêmes leads. Les leads se téléchargent en Excel.</p></a>
+    <a class="scene card wide" href="/laya"><div class="k">Laya · local ou hébergé</div><h2>Sur ton GPU ou chez Hugging Face ?</h2>
+      <p>La même décision envoyée à Laya en local, à la démo gratuite de Laya sur Hugging Face et à Jev : latence, réponses, coût. C'est ici qu'on choisit le Laya utilisé dans les duels.</p></a>
+    <a class="scene card small" href="/tetris"><div class="k">Tetris · Jev contre Opus</div><h2>Qui tient le rythme ?</h2>
+      <p>Inchangé, à deux.</p></a>
+    <a class="scene card small" href="/avis"><div class="k">Avis clients · Jev contre Opus</div><h2>Le tri en direct</h2>
+      <p>Inchangé, à deux.</p></a>
   </div>
   <div class="status" id="status"></div>
 </main>

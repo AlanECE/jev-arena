@@ -1,4 +1,4 @@
-"""Scene trading : deux fonds (Jev a gauche, Opus a droite) qui scalpent en direct sur Alpaca paper.
+"""Scene trading : trois fonds (Jev a gauche, Laya au milieu, Opus a droite) qui scalpent en direct.
 
 A chaque fermeture de bougie (1 s par defaut), chaque fonds demande une decision a SON modele s'il est libre.
 S'il attend encore la reponse precedente, la bougie est comptee comme "ratee" : c'est ce qui montre qu'Opus
@@ -21,7 +21,7 @@ from .sim import SimAccount
 from .feeds import SOURCES, Feed
 from .strategies.base import FundView, MarketView
 
-MODELS = ("jev", "opus")
+MODELS = ("jev", "laya", "opus")
 EPS = 1e-9
 CRYPTO_FEE_BPS = 25.0   # Alpaca crypto, palier 1, taker (0,25 % par ordre)
 
@@ -416,6 +416,9 @@ class TradingScene(SceneBase):
         self.shared = True
         self.account_info = {}
 
+    def busy(self) -> bool:
+        return self.running
+
     # ---------- proprietes ----------
     @property
     def market(self):
@@ -475,6 +478,7 @@ class TradingScene(SceneBase):
             main = AlpacaAccount("principal", C.ALPACA_KEY, C.ALPACA_SECRET, C.ALPACA_ENDPOINT)
         self.accounts = {"principal": main}
         self.funds["jev"].account = main
+        self.funds["laya"].account = main
         if not self.simulated and C.ALPACA_OPUS_KEY and C.ALPACA_OPUS_SECRET:
             second = AlpacaAccount("opus", C.ALPACA_OPUS_KEY, C.ALPACA_OPUS_SECRET, C.ALPACA_ENDPOINT)
             self.accounts["opus"] = second

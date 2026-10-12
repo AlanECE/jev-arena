@@ -17,6 +17,7 @@ Thumbs.db
 # propre a ce PC / developpement
 INSTALLE.md
 ARENA_DEV.md
+LISEZMOI-LAYA.md
 /ref/
 /tools/
 # SF Pro Display : licence Apple, non redistribuable (voir arena/app/static/common/fonts/LISEZMOI.md)
@@ -25,3 +26,6 @@ ARENA_DEV.md
 
 # exports de leads (donnees personnelles : jamais dans le depot)
 /exports/
+
+# copie a trois
+laya_build.log

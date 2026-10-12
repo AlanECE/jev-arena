@@ -1,0 +1,220 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Laya · local ou hébergé</title>
+<link rel="stylesheet" href="/static/common/arena.css">
+<link rel="icon" href="/static/common/logos/laya.png">
+<style>
+  body { overflow: auto; }
+  .topbar .title small { font-size: 17px; }
+  .page { display: grid; grid-template-columns: 560px minmax(0, 1fr); gap: 22px; padding: 20px 28px 28px; }
+  .form { padding: 20px 22px; display: flex; flex-direction: column; gap: 12px; align-self: start; }
+  .form label { font-size: 12px; color: var(--ink-3); text-transform: uppercase; letter-spacing: .08em; }
+  .form textarea { width: 100%; font: 500 13.5px/1.45 "Cascadia Mono", Consolas, monospace; border: 1px solid var(--line); border-radius: 12px;
+    padding: 10px 12px; background: var(--paper); color: var(--ink); resize: vertical; }
+  #state { height: 130px; }
+  #questions { height: 300px; }
+  .row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+  .row select { font-size: 14px; padding: 6px 8px; }
+  .btn.go { font-size: 18px; padding: 12px 26px; border-radius: 14px; }
+  .note { font-size: 13.5px; color: var(--ink-2); line-height: 1.45; }
+  .note b { color: var(--ink); }
+  .err { color: var(--short); font-size: 14px; min-height: 18px; }
+
+  .cols { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 18px; align-content: start; }
+  .tcard { padding: 18px 20px; position: relative; overflow: hidden; min-width: 0; }
+  .tcard::before { content: ""; position: absolute; left: 0; right: 0; top: 0; height: 5px; }
+  .tcard.local::before, .tcard.hosted::before { background: var(--laya); }
+  .tcard.jev::before { background: var(--jev); }
+  .tcard .model-head .name { font-size: 24px; }
+  .tcard .where { margin-top: 10px; font-size: 13px; color: var(--ink-2); min-height: 36px; }
+  .big { font-size: 56px; font-weight: 700; letter-spacing: -.02em; line-height: 1; margin-top: 14px; font-variant-numeric: tabular-nums; }
+  .local .big, .hosted .big { color: var(--laya); } .jev .big { color: var(--jev); }
+  .bigsub { font-size: 13px; color: var(--ink-3); margin-top: 4px; }
+  .kv { margin-top: 14px; border-top: 1px solid var(--line); }
+  .kv div { display: flex; justify-content: space-between; gap: 10px; padding: 7px 0; border-bottom: 1px solid var(--line); font-size: 15px; }
+  .kv span { color: var(--ink-2); }
+  .kv b { font-variant-numeric: tabular-nums; text-align: right; }
+  .ans { margin-top: 12px; display: flex; flex-direction: column; gap: 6px; }
+  .ans .q { background: var(--paper); border-radius: 10px; padding: 8px 10px; font-size: 14px; }
+  .ans .q .n { font-size: 12px; color: var(--ink-3); }
+  .ans .q .a { font-weight: 700; margin-top: 2px; overflow-wrap: anywhere; }
+  .ans .q .p { font-weight: 500; color: var(--ink-2); }
+  .bars { display: flex; gap: 2px; align-items: flex-end; height: 40px; margin-top: 12px; }
+  .bars i { flex: 1; background: var(--laya-soft); border-radius: 3px 3px 0 0; min-height: 2px; }
+  .jev .bars i { background: var(--jev-soft); }
+  .bars i.bad { background: var(--short-soft); }
+  .empty { color: var(--ink-3); font-size: 15px; margin-top: 18px; }
+  .agree { grid-column: 1 / -1; padding: 14px 20px; font-size: 16px; color: var(--ink-2); }
+  .agree b { color: var(--ink); }
+  .switch { padding: 14px 20px; grid-column: 1 / -1; display: flex; gap: 14px; align-items: center; flex-wrap: wrap; font-size: 15px; }
+  .switch select { font-size: 15px; padding: 6px 8px; }
+</style>
+</head>
+<body>
+<header class="topbar">
+  <div class="title">Laya : sur ton GPU ou hébergé ?<small>même décision, même format que Jev</small></div>
+  <div class="spacer"></div>
+  <a class="home" href="/">accueil</a>
+</header>
+
+<main class="page">
+  <section class="form card">
+    <div class="row"><label for="preset">Exemple</label>
+      <select id="preset">
+        <option value="avis">Avis client (note, sujet, rappel)</option>
+        <option value="ticket">Ticket support (service, urgence)</option>
+        <option value="lead">Lead à qualifier (offre motion design)</option>
+        <option value="trading">Trading BTC (une bougie)</option>
+      </select></div>
+    <label for="state">État (texte ou JSON)</label>
+    <textarea id="state" spellcheck="false"></textarea>
+    <label for="questions">Questions (format Jev : choice, score, noul)</label>
+    <textarea id="questions" spellcheck="false"></textarea>
+    <div class="row">
+      <label for="n">Répéter</label>
+      <select id="n"><option value="1">1 fois</option><option value="5" selected>5 fois</option><option value="20">20 fois</option></select>
+      <label><input type="checkbox" id="withJev" checked> avec Jev (payant, ≈ 0,00002 $ la décision)</label>
+    </div>
+    <div class="row"><button class="btn violet go" id="go" type="button">Comparer</button><span class="err" id="err"></span></div>
+    <div class="note"><b>Local</b> : le conteneur <code>laya</code> sur ta carte graphique, gratuit, rien ne sort de ton PC.
+      <b>Hébergé</b> : la démo officielle de Laya sur Hugging Face, gratuite et sans compte, mais publique : ta requête part chez
+      Hugging Face, la file d'attente est partagée et le service peut être lent ou coupé. <b>Jev</b> sert de référence.</div>
+  </section>
+
+  <section class="cols" id="cols">
+    <div class="switch card">Laya utilisé dans les duels (trading, leads) :
+      <select id="sel-laya" data-laya-backend><option value="local">local, sur ton GPU</option><option value="hosted">hébergé, Hugging Face</option></select>
+      <span class="note" id="checkTxt">vérification…</span></div>
+    <article class="tcard card local" data-t="local"></article>
+    <article class="tcard card hosted" data-t="hosted"></article>
+    <article class="tcard card jev" data-t="jev"></article>
+    <div class="agree card" id="agree">Lance une comparaison : la même décision part en même temps vers les trois.</div>
+  </section>
+</main>
+
+<script src="/static/common/arena.js"></script>
+<script>
+(function () {
+  const $ = (s) => document.querySelector(s);
+  const T = {
+    local: { name: "Laya · local", logo: "/static/common/logos/laya.png", where: "Conteneur laya (laya-serve) sur ta carte graphique · gratuit · tes données restent chez toi" },
+    hosted: { name: "Laya · hébergé", logo: "/static/common/logos/laya.png", where: "Démo officielle de Laya sur Hugging Face (convaiinnovations/laya-demo) · gratuit, sans compte" },
+    jev: { name: "Jev", logo: "/static/common/logos/typesafe-icon.png", where: "TypeSafe via OpenRouter · 0,042 $ par million de jetons d'entrée" },
+  };
+  const PRESETS = {
+    avis: {
+      state: { avis: "Livré avec dix jours de retard et le carton était écrasé. Le service client ne répond jamais. Plus jamais chez eux." },
+      questions: {
+        note: { type: "choice", instructions: "Quelle note sur 5 ce client a-t-il mise ?", criteria: { "1": "1 étoile, très mécontent", "2": "2 étoiles, mécontent", "3": "3 étoiles, mitigé", "4": "4 étoiles, content", "5": "5 étoiles, ravi" } },
+        sujet: { type: "choice", instructions: "De quoi parle surtout cet avis ?", criteria: { livraison: "retard, colis perdu ou abîmé", produit: "qualité, panne, défaut", service_client: "pas de réponse, mauvais accueil", prix: "trop cher, facturation" } },
+        a_rappeler: { type: "noul", instructions: "Faut-il recontacter ce client en priorité ?" },
+      },
+    },
+    ticket: {
+      state: { from: "user@acme.com", subject: "Duplicate charge on invoice #4411", body: "Hi, we were billed twice for March. Please refund the duplicate today or we will cancel our plan." },
+      questions: {
+        department: { type: "choice", instructions: "Which department should handle this request?", criteria: { billing: "invoices, payments, refunds", technical: "bugs, outages, system errors", sales: "pricing, new contracts", other: "everything else" } },
+        urgency: { type: "score", instructions: "How urgent is this request?", criteria: ["not urgent", "soon", "critical deadline or blocking issue"] },
+        churn_risk: { type: "noul", instructions: "Does the user threaten to cancel or leave?" },
+      },
+    },
+    lead: {
+      state: { lead: { github_bio: "Solo founder building an AI note-taking app for teachers. Launching on Product Hunt next week.", company: "Notely", github_followers: 140 },
+        site: { host: "notely.app", title: "Notely · AI notes for teachers", description: "Join the waitlist", signals: { waitlist_or_early_access: true, video: false } } },
+      questions: {
+        fit: { type: "noul", instructions: "Alan sells short motion-design promo videos to small businesses and indie makers that have their own app. Is `lead` a good prospect for Alan?" },
+        stage: { type: "choice", instructions: "What best describes `lead` and the product shown on `site`?", criteria: { prelaunch: "Pre-launch: waitlist, beta or coming soon", just_launched: "Live but new or small", small_business: "Established small business with its own product", big_company: "Large or well-known company", agency: "Agency, studio or freelancer selling services", no_product: "Personal site, portfolio or blog without a product" } },
+        priority: { type: "score", instructions: "How urgently should Alan contact `lead`?", criteria: ["Do not contact", "Low priority", "Good prospect", "Hot prospect"] },
+      },
+    },
+    trading: {
+      state: { symbol: "BTC/USD", bar_seconds: 1, stretch_sigma: 2.4, entry_threshold_sigma: 2.0, volume_zscore: 1.8, last_10s_return_bps: 6.1, position_in_5min_range: 0.94, planned_hold_seconds: 60 },
+      questions: {
+        position: { type: "choice", instructions: "Breakout-following scalper on 1-second BTC bars. A move beyond `entry_threshold_sigma` usually continues for `planned_hold_seconds`. Which position should be taken now?",
+          criteria: { long: "Buy now: the price just broke UP beyond the threshold", short: "Sell short now: the price just broke DOWN beyond the threshold", flat: "Stay out: the move is inside the normal range" } },
+      },
+    },
+  };
+  function loadPreset(k) {
+    const p = PRESETS[k];
+    $("#state").value = typeof p.state === "string" ? p.state : JSON.stringify(p.state, null, 2);
+    $("#questions").value = JSON.stringify(p.questions, null, 2);
+  }
+  $("#preset").addEventListener("change", (e) => loadPreset(e.target.value));
+  loadPreset("avis");
+
+  const med = (xs) => { if (!xs.length) return null; const s = [...xs].sort((a, b) => a - b); const m = s.length >> 1; return s.length % 2 ? s[m] : (s[m - 1] + s[m]) / 2; };
+  function ansHTML(answers) {
+    return Object.entries(answers || {}).map(([k, a]) => {
+      let v = "–", p = "";
+      if (a.type === "choice") { v = a.choice; const pr = (a.probabilities || {})[a.choice] ?? a.confidence; if (pr != null) p = ` · ${Arena.pct(pr)}`; }
+      else if (a.type === "noul") { v = a.noul >= 0.5 ? "oui" : "non"; p = ` · ${Arena.pct(a.noul)} oui`; }
+      else if (a.type === "score") { v = Number(a.score).toFixed(2).replace(".", ","); }
+      return `<div class="q"><div class="n">${k}</div><div class="a">${v}<span class="p">${p}</span></div></div>`;
+    }).join("");
+  }
+  function card(t, runs) {
+    const el = document.querySelector(`.tcard[data-t="${t}"]`);
+    const head = `<div class="model-head"><img src="${T[t].logo}" alt=""><div><div class="name">${T[t].name}</div></div></div><div class="where">${T[t].where}</div>`;
+    if (!runs) { el.innerHTML = head + `<div class="empty">${t === "jev" && !$("#withJev").checked ? "désactivé" : "en attente"}</div>`; return; }
+    const ok = runs.filter((r) => r.ok), lat = ok.map((r) => r.latency_ms);
+    const m = med(lat), max = Math.max(1, ...runs.map((r) => r.latency_ms));
+    const cost = runs.reduce((s, r) => s + (r.cost || 0), 0);
+    const last = ok[ok.length - 1];
+    const err = runs.find((r) => !r.ok);
+    el.innerHTML = head +
+      `<div class="big">${m == null ? "–" : Arena.ms(m)}</div><div class="bigsub">latence médiane · ${ok.length}/${runs.length} réponses</div>` +
+      `<div class="bars">${runs.map((r) => `<i class="${r.ok ? "" : "bad"}" style="height:${Math.max(4, 100 * r.latency_ms / max)}%" title="${Arena.ms(r.latency_ms)}"></i>`).join("")}</div>` +
+      `<div class="kv"><div><span>Plus rapide</span><b>${lat.length ? Arena.ms(Math.min(...lat)) : "–"}</b></div>` +
+      `<div><span>Plus lente</span><b>${lat.length ? Arena.ms(Math.max(...lat)) : "–"}</b></div>` +
+      `<div><span>Coût</span><b>${Arena.usd(cost)}</b></div></div>` +
+      (err ? `<div class="err">${String(err.error || "erreur").slice(0, 140)}</div>` : "") +
+      `<div class="ans">${last ? ansHTML(last.answers) : ""}</div>`;
+  }
+  ["local", "hosted", "jev"].forEach((t) => card(t, null));
+
+  function topOf(runs) {
+    const r = (runs || []).filter((x) => x.ok).pop();
+    if (!r) return null;
+    return Object.fromEntries(Object.entries(r.answers).map(([k, a]) => [k, a.type === "choice" ? a.choice : a.type === "noul" ? a.noul >= 0.5 : Math.round(a.score)]));
+  }
+  async function go() {
+    $("#err").textContent = "";
+    let state, questions;
+    const st = $("#state").value.trim();
+    try { state = st.startsWith("{") || st.startsWith("[") ? JSON.parse(st) : st; } catch (e) { $("#err").textContent = "État : JSON invalide"; return; }
+    try { questions = JSON.parse($("#questions").value); } catch (e) { $("#err").textContent = "Questions : JSON invalide"; return; }
+    const targets = ["local", "hosted"].concat($("#withJev").checked ? ["jev"] : []);
+    const b = $("#go"); b.disabled = true; b.textContent = "En cours…";
+    try {
+      const r = await fetch("/api/laya/compare", { method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ state, questions, n: +$("#n").value, targets }) });
+      const d = await r.json();
+      if (!r.ok) { $("#err").textContent = d.error || "erreur"; return; }
+      ["local", "hosted", "jev"].forEach((t) => card(t, d.results[t]));
+      const a = topOf(d.results.local), h = topOf(d.results.hosted), j = topOf(d.results.jev);
+      const keys = Object.keys(questions);
+      const same = (x, y) => (x && y ? keys.filter((k) => x[k] === y[k]).length : null);
+      const parts = [];
+      if (same(a, h) != null) parts.push(`Laya local et Laya hébergé donnent la même réponse sur <b>${same(a, h)}/${keys.length}</b> questions (même modèle, matériel différent)`);
+      if (same(a, j) != null) parts.push(`Laya local et Jev : <b>${same(a, j)}/${keys.length}</b>`);
+      $("#agree").innerHTML = parts.join(" · ") || "Pas assez de réponses pour comparer.";
+    } catch (e) { $("#err").textContent = String(e); }
+    finally { b.disabled = false; b.textContent = "Comparer"; }
+  }
+  $("#go").addEventListener("click", go);
+
+  $("#sel-laya").addEventListener("change", (e) => Arena.switchLaya(e.target.value));
+  fetch("/api/laya?check=1").then((r) => r.json()).then((d) => {
+    Arena.setLaya(d);
+    const c = d.check || {};
+    const f = (x) => (x && x.ok ? `répond (${Arena.ms(x.latency_ms)})` : `ne répond pas${x && x.error ? " : " + x.error.slice(0, 60) : ""}`);
+    $("#checkTxt").textContent = `local : ${f(c.local)} · hébergé : ${f(c.hosted)}`;
+  }).catch(() => ($("#checkTxt").textContent = "vérification impossible"));
+})();
+</script>
+</body>
+</html>

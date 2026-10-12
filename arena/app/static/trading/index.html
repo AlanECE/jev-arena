@@ -3,8 +3,8 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Scalping en direct · Jev Arena</title>
-<link rel="icon" href="/static/common/logos/typesafe-icon.png">
+<title>Scalping en direct · Jev, Laya, Opus</title>
+<link rel="icon" href="/static/common/logos/laya.png">
 <link rel="stylesheet" href="/static/common/arena.css">
 <link rel="stylesheet" href="/static/trading/trading.css">
 <script src="/static/vendor/lightweight-charts.standalone.production.js"></script>
@@ -36,6 +36,7 @@
     <select id="cThr" title="seuil d'entrée"><option value="2.0">2,0 σ</option><option value="2.5">2,5 σ</option><option value="3.0">3,0 σ</option></select>
     <select id="cFee" title="frais par ordre (points de base)"><option value="0">frais 0</option><option value="1">frais 1 pb</option><option value="5">frais 5 pb</option><option value="25">frais 25 pb</option></select>
     <select id="cDuration"><option value="3">3 min</option><option value="5">5 min</option><option value="10" selected>10 min</option><option value="20">20 min</option><option value="30">30 min</option><option value="0">illimité</option></select>
+    <select id="cLaya" title="où tourne Laya" data-laya-backend><option value="local">Laya local (GPU)</option><option value="hosted">Laya hébergé (HF)</option></select>
     <select id="cSize"><option value="10000">10 000 $</option><option value="25000">25 000 $</option><option value="50000">50 000 $</option><option value="100000" selected>100 000 $</option></select>
   </div>
   <span class="chip live hidden" id="liveChip">EN DIRECT</span>
@@ -46,15 +47,16 @@
 
 <div class="banner hidden" id="banner"></div>
 
-<main class="duel">
+<main class="duel three">
   <section class="fund card jev" id="fund-jev"></section>
+  <section class="fund card laya" id="fund-laya"></section>
   <section class="fund card opus" id="fund-opus"></section>
 </main>
 
 <div class="overlay card" id="overlay">
-  <div class="duo"><img src="/static/common/logos/typesafe-icon.png" alt=""><span>contre</span><img src="/static/common/logos/claude.png" alt=""></div>
-  <h2>Scalping en direct · <span class="jev">Jev</span> contre <span class="opus">Claude Opus 5.5</span></h2>
-  <p id="ovText">Même stratégie, mêmes données, même compte Alpaca paper. À chaque bougie d'une seconde, chaque modèle décide d'entrer long, short ou de rester à plat. Les sorties sont mécaniques et identiques.</p>
+  <div class="duo"><img src="/static/common/logos/typesafe-icon.png" alt=""><img src="/static/common/logos/laya.png" alt=""><img src="/static/common/logos/claude.png" alt=""></div>
+  <h2>Scalping en direct · <span class="jev">Jev</span>, <span class="laya">Laya</span> et <span class="opus">Claude Opus 5.5</span></h2>
+  <p id="ovText">Même stratégie, mêmes données, même courtier. À chaque bougie d'une seconde, chaque modèle décide d'entrer long, short ou de rester à plat. Les sorties sont mécaniques et identiques.</p>
   <button class="btn violet big" id="btnStartBig">Lancer le test</button>
   <div class="hint"><span id="ovStatus">connexion…</span> · ou <kbd>Espace</kbd> · <kbd>H</kbd> réglages</div>
 </div>

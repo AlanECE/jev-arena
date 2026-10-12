@@ -1,9 +1,9 @@
-// Scene trading : deux graphiques a la seconde (Jev a gauche, Opus a droite) alimentes en direct par le serveur.
+// Scene trading a trois : trois graphiques a la seconde (Jev a gauche, Laya au milieu, Opus a droite), alimentes en direct.
 // Page VIERGE a l'ouverture : rien ne tourne tant qu'Alan n'a pas appuye sur « Lancer le test ».
 (function () {
-  const MODELS = ["jev", "opus"];
+  const MODELS = ["jev", "laya", "opus"];
   const TZ = -new Date().getTimezoneOffset() * 60;       // les graphiques affichent l'heure locale
-  const TAPE_N = 96;
+  const TAPE_N = 46;   // trois colonnes : la bande tient en 46 bougies
   const COLORS = { long: "#12a150", short: "#e5484d", longA: "rgba(18,161,80,.55)", shortA: "rgba(229,72,77,.55)",
     ema: "#7b3ff2", vwap: "#e8a317" };
   const S = {
@@ -19,6 +19,7 @@
     el.querySelector(".model-head img").src = Arena.LOGOS[model];
     el.querySelector(".name").textContent = Arena.NAMES[model];
     el.querySelector(".maker").textContent = Arena.MAKERS[model];
+    if (model === "laya") el.querySelector(".maker").setAttribute("data-laya-maker", "");
     const chart = LightweightCharts.createChart(el.querySelector(".chart"), {
       autoSize: true,
       layout: { background: { type: "solid", color: "#ffffff" }, textColor: "#5b5368", fontFamily: "SF Pro Display", fontSize: 13 },
@@ -268,9 +269,10 @@
         <div class="row"><span>Frais estimés</span><b>${Arena.money(-s.fees)}</b></div>
         <div class="row"><span>Coût API</span><b>${Arena.usd(s.api_cost)}</b></div></div>`;
     };
+    box.classList.add("three-final");
     box.innerHTML = `<h2>Fin du test · ${Arena.clock(ev.elapsed)}</h2>
-      <div class="why">${ev.reason}. Positions remises à plat sur Alpaca.</div>
-      <div class="cols">${col("jev")}${col("opus")}</div>
+      <div class="why">${ev.reason}. Positions remises à plat. Laya : ${Arena.MAKERS.laya}, gratuit.</div>
+      <div class="cols">${MODELS.map(col).join("")}</div>
       <div class="close"><button class="btn ghost" id="closeFinal">Fermer</button><button class="btn violet" id="againFinal">Nouveau test</button></div>`;
     box.classList.remove("hidden");
     document.getElementById("closeFinal").onclick = () => box.classList.add("hidden");
@@ -306,7 +308,7 @@
     S.feeBps = cfg.fee_bps != null ? +cfg.fee_bps : S.simulated ? 0 : S.crypto ? 25 : 0;
     const ov = document.getElementById("ovText");
     const where = S.simulated ? "un courtier simulé (exécution au prix réel du flux, long et short)" : "le même compte Alpaca paper";
-    if (s && s.description) ov.textContent = `${cfg.symbol} · ${s.description} Les deux fonds reçoivent les mêmes données et ${where} ; seule la décision d'entrée change.`;
+    if (s && s.description) ov.textContent = `${cfg.symbol} · ${s.description} Les trois fonds reçoivent les mêmes données et ${where} ; seule la décision d'entrée change.`;
   }
   function readCfg() {
     return {
@@ -325,15 +327,15 @@
     S.running = r;
     document.getElementById("btnStart").textContent = r ? "Arrêter" : "Lancer le test";
     document.getElementById("liveChip").classList.toggle("hidden", !r);
-    for (const id of ["cSource", "cSymbol", "cBar", "cStrategy", "cDuration", "cSize", "cThr", "cBroker", "cPreset", "cFee"]) document.getElementById(id).disabled = r;
+    for (const id of ["cSource", "cSymbol", "cBar", "cStrategy", "cDuration", "cSize", "cThr", "cBroker", "cPreset", "cFee", "cLaya"]) document.getElementById(id).disabled = r;
     document.getElementById("controls").classList.toggle("hidden", r);
     document.getElementById("infoChips").classList.toggle("hidden", !r);
     document.getElementById("overlay").classList.toggle("hidden", r);
   }
   function footer() {
     const parts = [];
-    parts.push(S.simulated ? `courtier simulé : exécution au prix réel du flux${S.feeBps ? "" : ", sans frais"} · 2 fonds (Jev / Opus)`
-      : S.shared ? "1 compte Alpaca paper · 2 fonds séparés (Jev / Opus)" : "2 comptes Alpaca paper (Jev / Opus)");
+    parts.push(S.simulated ? `courtier simulé : exécution au prix réel du flux${S.feeBps ? "" : ", sans frais"} · 3 fonds (Jev / Laya / Opus)`
+      : S.shared ? "1 compte Alpaca paper · 3 fonds séparés (Jev / Laya / Opus)" : "comptes Alpaca paper (Jev + Laya / Opus)");
     parts.push(S.simulated ? "long, short ou à plat" : S.crypto ? "crypto : pas de vente à découvert sur Alpaca (long ou à plat)" : "actions : long, short ou à plat");
     const ex = S.exitRules || {};
     const rules = [];
@@ -342,14 +344,16 @@
     if (ex.stop_loss_bps) rules.push(`stop −${ex.stop_loss_bps} pb`);
     if (rules.length) parts.push("sorties mécaniques : " + rules.join(", "));
     parts.push(`frais estimés ${Arena.num(S.feeBps, 0)} pb par ordre`);
-    parts.push("décisions réelles via OpenRouter");
+    parts.push(`décisions réelles : Jev et Opus via OpenRouter, Laya ${Arena.LAYA && Arena.LAYA.backend === "hosted" ? "sur Hugging Face" : "sur ton GPU"}`);
     document.getElementById("footer").textContent = parts.join("   ·   ");
   }
 
   // ---------- evenements du serveur ----------
   function onEvent(ev) {
     switch (ev.type) {
+      case "laya": Arena.setLaya(ev.laya); footer(); break;
       case "snapshot": {
+        Arena.setLaya(ev.laya);
         const s = ev.data;
         S.sources = s.sources; S.strategies = s.strategies; S.shared = s.shared; S.exitRules = s.exit_rules || {};
         S.simulated = !!s.simulated; S.hasAlpaca = !!s.has_alpaca;
@@ -457,6 +461,7 @@
   for (const id of ["cSource", "cSymbol", "cBar", "cStrategy", "cDuration", "cSize", "cThr", "cBroker", "cFee"]) {
     document.getElementById(id).addEventListener("change", () => S.ws.send({ cmd: "config", cfg: readCfg() }));
   }
+  document.getElementById("cLaya").addEventListener("change", (e) => { Arena.switchLaya(e.target.value); e.target.blur(); });
   const PRESETS = {
     "btc-sim": { source: "coinbase", symbol: "BTC/USD", broker: "sim", position_usd: 100000, strategy: "rupture" },
     "tsla-alpaca": { source: "alpaca-iex", symbol: "TSLA", broker: "alpaca", position_usd: 100000, strategy: "ressort" },

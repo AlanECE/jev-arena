@@ -1,11 +1,14 @@
-"""Les deux decideurs de l'arene, appeles pour de vrai via OpenRouter.
+"""Les trois decideurs de l'arene : Jev et Claude Opus 5.5 via OpenRouter, Laya en local ou sur Hugging Face.
 
 - Jev (TypeSafe) : API Decisions d'OpenRouter, POST /api/alpha/decisions. Etat + questions typees
   -> reponses typees avec probabilites. Jev n'ecrit jamais de texte.
 - Claude Opus 5.5 : chat completions OpenRouter. Il recoit EXACTEMENT le meme etat et les memes questions,
   et repond en JSON. Sa "confiance" est declaree par lui (ce n'est pas une probabilite calculee).
 
-Les deux renvoient la meme forme :
+- Laya (Convai Innovations, open source) : meme requete que Jev ({state, questions} -> answers), servie par
+  laya-serve dans le conteneur `laya` (GPU) ou par la demo gratuite de Laya sur Hugging Face. Cout : 0 $.
+
+Les trois renvoient la meme forme :
   {model, model_id, ok, answers, latency_ms, cost, error, raw, t0, t1, tag}
   answers = {nom_question: {type, choice|noul|score, probabilities?, confidence?, declared?}}
 
@@ -23,13 +26,33 @@ import time
 
 import httpx
 
-from .config import JEV_MODEL, OPENROUTER_KEY, OPUS_EFFORT, OPUS_MODEL
+from .config import JEV_MODEL, LAYA_BACKEND, LAYA_HOSTED_URL, LAYA_URL, OPENROUTER_KEY, OPUS_EFFORT, OPUS_MODEL
 from .ledger import LEDGER_OBJ, BudgetExceeded
+
+LAYA_BACKENDS = {
+    "local": {"label": "Laya · local", "where": "ton GPU (laya-serve)", "model_id": "laya (local)"},
+    "hosted": {"label": "Laya · hébergé", "where": "Hugging Face (démo gratuite)", "model_id": "laya (Hugging Face)"},
+}
+LAYA = {"backend": LAYA_BACKEND if LAYA_BACKEND in LAYA_BACKENDS else "local"}
 
 MODELS = {
     "jev": {"label": "Jev", "maker": "TypeSafe AI", "model_id": JEV_MODEL},
+    "laya": {"label": "Laya", "maker": "Convai · open source", "model_id": LAYA_BACKENDS[LAYA["backend"]]["model_id"]},
     "opus": {"label": "Claude Opus 5.5", "maker": "Anthropic", "model_id": OPUS_MODEL},
 }
+
+
+def set_laya_backend(backend: str) -> dict:
+    if backend not in LAYA_BACKENDS:
+        raise ValueError(f"backend Laya inconnu : {backend}")
+    LAYA["backend"] = backend
+    MODELS["laya"]["model_id"] = LAYA_BACKENDS[backend]["model_id"]
+    return laya_info()
+
+
+def laya_info() -> dict:
+    b = LAYA["backend"]
+    return {"backend": b, **LAYA_BACKENDS[b], "backends": LAYA_BACKENDS}
 
 _HEADERS = {
     "Authorization": f"Bearer {OPENROUTER_KEY}",
@@ -191,10 +214,97 @@ async def opus_decide(scene: str, state, questions: dict, tag: str = "", retries
     return out
 
 
+# ---------------------------------------------------------------------------------------------- Laya
+# Client HTTP a part : il ne porte PAS l'en-tete d'autorisation OpenRouter (la cle ne part que chez OpenRouter).
+_laya_http: httpx.AsyncClient | None = None
+_KEEP = ("type", "choice", "probabilities", "confidence", "noul", "score")
+
+
+def laya_client() -> httpx.AsyncClient:
+    global _laya_http
+    if _laya_http is None:
+        _laya_http = httpx.AsyncClient(timeout=httpx.Timeout(60.0, connect=10.0),
+                                       limits=httpx.Limits(max_connections=64, max_keepalive_connections=32))
+    return _laya_http
+
+
+def _clean_answers(answers: dict) -> dict:
+    return {k: {f: v for f, v in (a or {}).items() if f in _KEEP} for k, a in (answers or {}).items()}
+
+
+async def _laya_local(state, questions: dict) -> dict:
+    r = await laya_client().post(f"{LAYA_URL}/v1/systemone", json={"state": state, "questions": questions})
+    try:
+        d = r.json()
+    except Exception:
+        raise RuntimeError(f"HTTP {r.status_code} : {r.text[:160]}")
+    if r.status_code != 200 or "answers" not in d:
+        det = d.get("detail") if isinstance(d, dict) else d
+        raise RuntimeError(f"HTTP {r.status_code} : {str(det)[:180]}")
+    return d
+
+
+async def _laya_hosted(state, questions: dict) -> dict:
+    """Demo officielle de Laya sur Hugging Face (Gradio) : point d'acces /run_playground (etat + questions en JSON)."""
+    base = f"{LAYA_HOSTED_URL}/gradio_api/call/run_playground"
+    st = state if isinstance(state, str) else json.dumps(state, ensure_ascii=False)
+    r = await laya_client().post(base, json={"data": [st, json.dumps(questions, ensure_ascii=False)]})
+    if r.status_code != 200:
+        raise RuntimeError(f"Hugging Face HTTP {r.status_code} : {r.text[:160]}")
+    eid = r.json().get("event_id")
+    r2 = await laya_client().get(f"{base}/{eid}")
+    event, data = None, None
+    for line in r2.text.splitlines():
+        if line.startswith("event:"):
+            event = line[6:].strip()
+        elif line.startswith("data:"):
+            data = line[5:].strip()
+    if event != "complete" or not data:
+        raise RuntimeError(f"Hugging Face : {event or 'pas de réponse'} {str(data)[:120] if data not in (None, 'null') else ''}".strip())
+    out = json.loads(data)
+    raw = out[1] if isinstance(out, list) and len(out) > 1 else None
+    try:
+        d = json.loads(raw) if isinstance(raw, str) else raw
+    except Exception:
+        raise RuntimeError(f"réponse illisible : {str(raw)[:160]}")
+    if not isinstance(d, dict) or "answers" not in d:
+        raise RuntimeError(f"réponse sans answers : {str(raw)[:160]}")
+    return d
+
+
+async def laya_decide(scene: str, state, questions: dict, tag: str = "", retries: int = 0,
+                      backend: str | None = None) -> dict:
+    """Laya en local (laya-serve sur le GPU) ou heberge (demo Hugging Face). Gratuit dans les deux cas : cout 0.
+    `backend` force l'un des deux pour cet appel (page /laya) sans changer celui des epreuves."""
+    backend = backend if backend in LAYA_BACKENDS else LAYA["backend"]
+    fn = _laya_hosted if backend == "hosted" else _laya_local
+    t0 = time.time()
+    last = None
+    out = None
+    for attempt in range(retries + 1):
+        try:
+            d = await fn(state, questions)
+            out = _result("laya", t0, time.time(), ok=True, answers=_clean_answers(d["answers"]), cost=0.0, tag=tag,
+                          backend=backend, tokens={"in": (d.get("usage") or {}).get("input_tokens"), "out": 0},
+                          routed=((d.get("routing") or {}).get("model")))
+            break
+        except Exception as e:
+            last = str(e)[:200] or type(e).__name__
+            if attempt < retries:
+                await asyncio.sleep(0.5 * (attempt + 1))
+    if out is None:
+        out = _result("laya", t0, time.time(), error=last, tag=tag, backend=backend)
+    LEDGER_OBJ.add(scene, {"model": "laya", "ok": out["ok"], "latency_ms": out["latency_ms"], "cost": 0.0,
+                           "tag": tag, "error": out["error"], "backend": backend})
+    return out
+
+
 async def decide(model: str, scene: str, state, questions: dict, tag: str = "", retries: int = 0) -> dict:
-    """Point d'entree unique. model = 'jev' ou 'opus'. Ne leve jamais d'exception sauf BudgetExceeded."""
+    """Point d'entree unique. model = 'jev', 'laya' ou 'opus'. Ne leve jamais d'exception sauf BudgetExceeded."""
     if model == "jev":
         return await jev_decide(scene, state, questions, tag=tag, retries=retries)
+    if model == "laya":
+        return await laya_decide(scene, state, questions, tag=tag, retries=retries)
     if model == "opus":
         return await opus_decide(scene, state, questions, tag=tag, retries=retries)
     raise ValueError(f"modele inconnu : {model}")
@@ -213,5 +323,5 @@ def top_choice(answer: dict) -> tuple[str | None, float | None]:
     return c, p
 
 
-__all__ = ["MODELS", "decide", "jev_decide", "opus_decide", "top_choice", "BudgetExceeded",
-           "build_opus_prompt", "parse_llm_answers"]
+__all__ = ["MODELS", "LAYA", "decide", "jev_decide", "laya_decide", "opus_decide", "top_choice", "BudgetExceeded",
+           "build_opus_prompt", "parse_llm_answers", "set_laya_backend", "laya_info"]

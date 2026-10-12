@@ -3,28 +3,62 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>La course aux leads · Jev Arena</title>
+<title>La course aux leads · Jev, Laya, Opus</title>
 <link rel="stylesheet" href="/static/common/arena.css">
 <link rel="stylesheet" href="/static/leads/leads.css">
-<link rel="icon" href="/static/common/logos/typesafe-icon.png">
+<link rel="icon" href="/static/common/logos/laya.png">
 </head>
 <body>
 <header class="topbar">
-  <div class="title">La course aux <span id="t-target">100</span> leads<small>prospection en direct · motion design pour les applis des TPE / PME</small></div>
+  <div class="title">La course aux <span id="t-target">100</span> leads<small>Jev · Laya · Opus · motion design pour les applis des TPE / PME</small></div>
   <div class="spacer"></div>
   <div class="settings" id="settings">
     <label>Objectif <select id="sel-target"></select></label>
     <label>En parallèle <select id="sel-conc"></select></label>
+    <label>Laya <select id="sel-laya" data-laya-backend><option value="local">local (GPU)</option><option value="hosted">hébergé (Hugging Face)</option></select></label>
   </div>
   <button class="btn violet go" id="btn-start" type="button">Lancer la course</button>
   <button class="btn ghost again" id="btn-new" type="button" hidden>Nouvelle course</button>
+  <button class="btn ghost xls" id="btn-xls" type="button" hidden>Leads en Excel</button>
   <span class="chip" id="phase">prêt</span>
   <span class="chip mask-chip" id="mask-chip">masqué</span>
   <span class="conn" id="conn">connexion…</span>
 </header>
 
-<main class="wrap">
-  <!-- Jev, toujours a gauche -->
+<main class="wrap three">
+  <!-- Le pipeline partage, en bandeau -->
+  <section class="strip">
+    <div class="clock card">
+      <div class="label">Chrono</div>
+      <div class="big num" id="clock">0:00</div>
+      <div class="sub" id="clock-sub"><b id="conc-txt">8</b> en parallèle chacun</div>
+    </div>
+    <div class="pipe card">
+      <div class="stage-box" id="st-scout">
+        <div class="ico gh"><svg viewBox="0 0 16 16" width="26" height="26" aria-hidden="true"><path fill="#fff" d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg></div>
+        <div class="txt"><div class="t">Scout · GitHub</div><div class="d" id="q-txt">recherche de créateurs d'applis</div></div>
+        <div class="n num"><span id="n-profiles">0</span><small>profils</small></div>
+      </div>
+      <div class="flow h" id="flow1"><i></i><i></i><i></i></div>
+      <div class="stage-box" id="st-web">
+        <div class="ico duo"><span class="lpw"><img src="/static/common/logos/lightpanda.png" alt=""></span><img src="/static/leads/crawl4ai.png" alt="" class="c4"></div>
+        <div class="txt"><div class="t">Lightpanda · Crawl4AI</div><div class="d"><span>Lightpanda <b id="n-lp">0</b></span> · <span>Crawl4AI <b id="n-c4">0</b></span> · <span class="fail">échecs <b id="n-fail">0</b></span></div></div>
+        <div class="n num"><span id="n-pages">0</span><small>pages</small></div>
+      </div>
+      <div class="flow h" id="flow2"><i></i><i></i><i></i></div>
+      <div class="stage-box split" id="st-ready">
+        <div class="txt c"><div class="n num"><span id="n-ready">0</span><small> / <span id="n-target">100</span></small></div><div class="d">leads envoyés aux trois modèles</div></div>
+      </div>
+      <div class="pipe-foot" id="pipe-foot">pages contact ouvertes : <b id="n-contact">0</b> · visites évitées : <b id="n-cache">0</b><span class="feed-last" id="feed"></span></div>
+    </div>
+    <div class="agree card">
+      <div class="label">Accord des trois</div>
+      <div class="big num" id="agree">–</div>
+      <div class="sub" id="agree-sub">même verdict OUI / NON</div>
+      <div class="pairs" id="agree-pairs"></div>
+    </div>
+  </section>
+
   <section class="side jev" id="side-jev">
     <div class="head card">
       <div class="top">
@@ -58,46 +92,39 @@
     </div>
   </section>
 
-  <!-- Le pipeline partage -->
-  <section class="center">
-    <div class="clock card">
-      <div class="label">Chrono</div>
-      <div class="big num" id="clock">0:00</div>
-      <div class="sub" id="clock-sub">mêmes leads, mêmes questions · <b id="conc-txt">8</b> en parallèle chacun</div>
-    </div>
-    <div class="pipe card">
-      <div class="stage-box" id="st-scout">
-        <div class="ico gh"><svg viewBox="0 0 16 16" width="26" height="26" aria-hidden="true"><path fill="#fff" d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg></div>
-        <div class="txt"><div class="t">Scout · GitHub</div><div class="d" id="q-txt">recherche de créateurs d'applis</div></div>
-        <div class="n num"><span id="n-profiles">0</span><small>profils</small></div>
+  <section class="side laya" id="side-laya">
+    <div class="head card">
+      <div class="top">
+        <div class="model-head"><img src="/static/common/logos/laya.png" alt=""><div><div class="name accent">Laya</div><div class="maker" data-laya-maker>open source · sur ton GPU</div></div></div>
+        <div class="count num"><span data-k="done">0</span><small> / <span data-k="target">100</span></small></div>
       </div>
-      <div class="flow" id="flow1"><i></i><i></i><i></i></div>
-      <div class="stage-box" id="st-web">
-        <div class="ico duo"><span class="lpw"><img src="/static/common/logos/lightpanda.png" alt=""></span><img src="/static/leads/crawl4ai.png" alt="" class="c4"></div>
-        <div class="txt"><div class="t">Lightpanda · Crawl4AI</div><div class="d">chaque page lue une seule fois</div></div>
-        <div class="n num"><span id="n-pages">0</span><small>pages</small></div>
-        <div class="mini"><span><img src="/static/common/logos/lightpanda.png" alt="" class="mlp">Lightpanda <b id="n-lp">0</b></span><span><img src="/static/leads/crawl4ai.png" alt="">Crawl4AI <b id="n-c4">0</b></span><span class="fail">échecs <b id="n-fail">0</b></span></div>
+      <div class="progress big"><i data-k="bar"></i></div>
+      <div class="stats6">
+        <div class="stat"><div class="label">Temps</div><div class="value num" data-k="time">0:00,0</div></div>
+        <div class="stat"><div class="label">Décisions</div><div class="value num" data-k="decisions">0</div></div>
+        <div class="stat"><div class="label">Par décision</div><div class="value num" data-k="lat">–</div></div>
+        <div class="stat"><div class="label">Coût réel</div><div class="value num" data-k="cost">0,0000 $</div></div>
+        <div class="stat"><div class="label">À contacter</div><div class="value num" data-k="oui">0</div></div>
+        <div class="stat"><div class="label">En file</div><div class="value num" data-k="waiting">0</div></div>
       </div>
-      <div class="flow" id="flow2"><i></i><i></i><i></i></div>
-      <div class="stage-box split" id="st-ready">
-        <span class="arrow l">◀</span>
-        <div class="txt c"><div class="n num"><span id="n-ready">0</span><small> / <span id="n-target">100</span></small></div><div class="d">leads envoyés aux deux modèles</div></div>
-        <span class="arrow r">▶</span>
+      <div class="substatus"><span data-k="sub">En attente du départ</span><span class="done-chip" data-k="donechip"></span></div>
+    </div>
+    <div class="body">
+      <div class="emails card">
+        <div class="etop">
+          <div class="label">Emails trouvés</div>
+          <div class="ecount num"><span data-k="ecount">0</span></div>
+          <div class="esub" data-k="esub">la liste se remplit pendant la course</div>
+        </div>
+        <div class="elist" data-k="elist"><div class="empty"></div></div>
       </div>
-      <div class="pipe-foot" id="pipe-foot">pages contact ouvertes : <b id="n-contact">0</b> · visites évitées : <b id="n-cache">0</b></div>
-    </div>
-    <div class="agree card">
-      <div class="label">Accord Jev · Opus</div>
-      <div class="big num" id="agree">–</div>
-      <div class="sub" id="agree-sub">sur le verdict OUI / NON</div>
-    </div>
-    <div class="feed card">
-      <div class="label">Le web en direct</div>
-      <div class="lines" id="feed"></div>
+      <div class="list card">
+        <div class="cols"><span>Lead · contact</span><span class="c">Prio.</span><span>Verdict</span><span class="r">Décisions</span></div>
+        <div class="rows" data-k="rows"><div class="empty">Prêt · « Lancer la course » ou Espace</div></div>
+      </div>
     </div>
   </section>
 
-  <!-- Opus, toujours a droite -->
   <section class="side opus" id="side-opus">
     <div class="head card">
       <div class="top">
@@ -134,9 +161,11 @@
 
 <div class="final" id="final" hidden></div>
 <div class="banner" id="banner" hidden></div>
-<div class="keys" id="keys">Espace : lancer · R : nouvelle course · M : démasquer · F : bilan</div>
+<div class="keys" id="keys">Espace : lancer · R : nouvelle course · M : démasquer · F : bilan · E : leads en Excel</div>
 
+<script src="/static/vendor/exceljs.min.js"></script>
 <script src="/static/common/arena.js"></script>
+<script src="/static/common/leads_export.js"></script>
 <script src="/static/leads/leads.js"></script>
 </body>
 </html>

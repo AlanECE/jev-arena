@@ -26,6 +26,13 @@ ALPACA_SECRET = env("ALPACA_SECRET")
 ALPACA_OPUS_KEY = env("ALPACA_OPUS_KEY")
 ALPACA_OPUS_SECRET = env("ALPACA_OPUS_SECRET")
 
+# Laya (open source, Convai Innovations) : meme format de questions que Jev.
+# "local"  = le conteneur `laya` de ce projet (laya-serve, POST /v1/systemone), sur la carte graphique ;
+# "hosted" = la demo officielle de Laya hebergee gratuitement par Hugging Face (Space Gradio, sans compte).
+LAYA_BACKEND = env("LAYA_BACKEND", "local")
+LAYA_URL = (env("LAYA_URL", "http://laya:8000") or "").rstrip("/")
+LAYA_HOSTED_URL = (env("LAYA_HOSTED_URL", "https://convaiinnovations-laya-demo.hf.space") or "").rstrip("/")
+
 GITHUB_TOKEN = env("GITHUB_TOKEN")
 CRAWL4AI_URL = env("CRAWL4AI_URL", "http://crawl4ai:11235")
 CRAWL4AI_TOKEN = env("CRAWL4AI_API_TOKEN")

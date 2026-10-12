@@ -66,9 +66,25 @@
     toastTimer = setTimeout(() => t.classList.remove("show"), 4500);
   };
 
-  Arena.LOGOS = { jev: "/static/common/logos/typesafe-icon.png", opus: "/static/common/logos/claude.png" };
-  Arena.NAMES = { jev: "Jev", opus: "Claude Opus 5.5" };
-  Arena.MAKERS = { jev: "TypeSafe AI · via OpenRouter", opus: "Anthropic · via OpenRouter" };
+  Arena.LOGOS = { jev: "/static/common/logos/typesafe-icon.png", laya: "/static/common/logos/laya.png", opus: "/static/common/logos/claude.png" };
+  Arena.NAMES = { jev: "Jev", laya: "Laya", opus: "Claude Opus 5.5" };
+  Arena.MAKERS = { jev: "TypeSafe AI · via OpenRouter", laya: "open source · sur ton GPU", opus: "Anthropic · via OpenRouter" };
+  Arena.LAYA_WHERE = { local: "open source · sur ton GPU", hosted: "open source · Hugging Face (gratuit)" };
+  // Laya : local (conteneur laya, GPU) ou heberge (demo gratuite Hugging Face). Met a jour les libelles de la page.
+  Arena.setLaya = function (info) {
+    if (!info) return;
+    Arena.LAYA = info;
+    Arena.MAKERS.laya = Arena.LAYA_WHERE[info.backend] || Arena.MAKERS.laya;
+    document.querySelectorAll("[data-laya-maker]").forEach((el) => (el.textContent = Arena.MAKERS.laya));
+    document.querySelectorAll("select[data-laya-backend]").forEach((el) => (el.value = info.backend));
+  };
+  Arena.switchLaya = async function (backend) {
+    const r = await fetch("/api/laya/backend", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ backend }) });
+    const d = await r.json();
+    if (!r.ok) { Arena.toast(d.error || "impossible de changer Laya"); Arena.setLaya(Arena.LAYA); return; }
+    Arena.setLaya(d);
+    Arena.toast(backend === "hosted" ? "Laya passe sur Hugging Face (hébergé, gratuit)" : "Laya passe en local, sur ton GPU");
+  };
 
   window.Arena = Arena;
 })();

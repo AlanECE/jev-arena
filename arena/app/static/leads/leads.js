@@ -1,9 +1,9 @@
-// La course aux leads : Jev (gauche) contre Opus (droite) sur le meme flux de vrais leads.
+// La course aux leads a trois : Jev (gauche), Laya (milieu), Opus (droite) sur le meme flux de vrais leads.
 // Tout vient du serveur (WebSocket /ws/leads) : rien n'est simule ici, la page ne fait qu'afficher.
 // La page s'ouvre toujours vierge : seule une course EN COURS est renvoyee par le snapshot.
 (function () {
   const $ = (s, el = document) => el.querySelector(s);
-  const MODELS = ["jev", "opus"];
+  const MODELS = ["jev", "laya", "opus"];
   const VISIBLE = 13;      // lignes de leads gardees dans le DOM
   const EMAILS_KEPT = 18;  // emails gardes dans la liste (les plus recents en haut)
   const STAGE_FR = {
@@ -188,25 +188,16 @@
     const title = e.error ? ` title="${esc(e.error)}"` : "";
     return `<div class="fl ${ok ? "ok" : "fail"}"${title}><span class="tm">${tclock(e.t, false)}</span><span class="what">${who}${what}</span><span class="res">${res}</span></div>`;
   }
-  function addFeed(e, animate = true) {
+  let lastFeed = null;
+  function addFeed(e) {   // version a trois : la derniere page lue, sur une ligne, dans le bandeau du pipeline
+    lastFeed = e;
     const box = $("#feed");
-    const d = document.createElement("div");
-    d.innerHTML = feedLine(e);
-    const el = d.firstChild;
-    el._e = e;
-    if (!animate) el.style.animation = "none";
-    box.prepend(el);
-    const all = box.children;
-    for (let i = all.length - 1; i >= 12; i--) all[i].remove();
+    let what = (e.model ? `<span class="dot ${e.model}" style="display:inline-block;width:7px;height:7px;border-radius:50%;margin-right:5px"></span>` : "") + esc(maskHost(e.host));
+    if (e.kind === "contact") what += " " + esc(maskPath(e.path));
+    const res = e.cached ? "déjà lue" : e.ok ? `<span class="ok">${TOOL_FR[e.tool] || e.tool} · ${secs(e.ms)}</span>` : `<span class="fail">échec · ${secs(e.ms)}</span>`;
+    box.innerHTML = `web : ${what} · ${res}`;
   }
-  function rerenderFeed() {
-    $("#feed").querySelectorAll(".fl").forEach((el) => {
-      const d = document.createElement("div");
-      d.innerHTML = feedLine(el._e);
-      const n = d.firstChild; n._e = el._e; n.style.animation = "none";
-      el.replaceWith(n);
-    });
-  }
+  function rerenderFeed() { if (lastFeed) addFeed(lastFeed); }
 
   // ------------------------------------------------------------------ compteurs
   function elapsedNow() {
@@ -257,7 +248,7 @@
     setText($("#n-profiles"), Arena.num(p.profiles || 0));
     setText($("#n-pages"), Arena.num(f.pages || 0));
     setText($("#n-ready"), p.dispatched || 0);
-    setText($("#n-contact"), Arena.num((st.models.jev.links_opened || 0) + (st.models.opus.links_opened || 0)));
+    setText($("#n-contact"), Arena.num(MODELS.reduce((n, m) => n + ((st.models[m] || {}).links_opened || 0), 0)));
     setText($("#n-cache"), f.cache_hits || 0);
     let q = "recherche de créateurs d'applis";
     if (p.github_pause) q = `GitHub : limite atteinte, pause ${p.github_pause} s`;
@@ -271,9 +262,13 @@
     $("#st-web").classList.toggle("active", S.phase === "running" && (srcOn || (f.inflight || 0) > 0));
     $("#flow1").classList.toggle("on", srcOn);
     $("#flow2").classList.toggle("on", srcOn);
-    const a = st.agree || {};
-    setText($("#agree"), a.n ? pct(a.verdict) : "–");
-    setText($("#agree-sub"), a.n ? `verdict OUI / NON · ${plural(a.n, "lead")}${a.link != null ? " · même lien " + pct(a.link) : ""}` : "sur le verdict OUI / NON");
+    const a = st.agree || {}, a3 = a.all3 || {};
+    setText($("#agree"), a3.n ? pct(a3.verdict) : "–");
+    setText($("#agree-sub"), a3.n ? `même verdict OUI / NON · ${plural(a3.n, "lead")}` : "même verdict OUI / NON");
+    const pairs = [["jev-opus", "Jev · Opus"], ["jev-laya", "Jev · Laya"], ["laya-opus", "Laya · Opus"]]
+      .map(([k, l]) => `${l} <b>${(a[k] || {}).n ? pct(a[k].verdict) : "–"}</b>`).join("<br>");
+    const pe = $("#agree-pairs");
+    if (pe.innerHTML !== pairs) pe.innerHTML = pairs;
   }
 
   function tick() {
@@ -322,12 +317,12 @@
   function idleStats() {
     const z = { done: 0, decisions: 0, cost: 0, emails: 0, emails_link: 0, email_count: 0, oui: 0, waiting: 0, inflight: 0,
       t_done: null, lat_med_ms: null, failed_calls: 0, links_opened: 0 };
-    return { elapsed: 0, target: S.config.target, pipe: { fetch: {} }, models: { jev: { ...z }, opus: { ...z } }, agree: {} };
+    return { elapsed: 0, target: S.config.target, pipe: { fetch: {} }, models: { jev: { ...z }, laya: { ...z }, opus: { ...z } }, agree: {} };
   }
 
   function blank(msg) {  // remet toute la page a zero (la plateforme est toujours vierge entre deux courses)
     S.summary = null; S.showFinal = false; renderFinal(); banner(null);
-    clearRows(msg); clearEmails(); $("#feed").innerHTML = ""; S.flags = {};
+    clearRows(msg); clearEmails(); $("#feed").innerHTML = ""; lastFeed = null; S.flags = {};
   }
 
   // ------------------------------------------------------------------ bilan
@@ -339,45 +334,46 @@
       setTimeout(() => { if (!S.showFinal) box.hidden = true; }, 600);
       return;
     }
-    const J = sm.models.jev, O = sm.models.opus, A = sm.agreement || {}, R = sm.ratio || {};
+    const M = sm.models, A = sm.agreement || {};
     const col = (m, s) => `
       <div class="fcol ${m}">
-        <div class="model-head"><img src="${Arena.LOGOS[m]}" alt=""><div><div class="name accent">${Arena.NAMES[m]}</div></div></div>
+        <div class="model-head"><img src="${Arena.LOGOS[m]}" alt=""><div><div class="name accent">${Arena.NAMES[m]}</div><div class="maker">${Arena.MAKERS[m]}</div></div></div>
         <div class="frows">
           <div class="frow hero"><span class="k">Temps pour ${s.done} leads</span><span class="v">${tclock(s.time_s)}</span></div>
           <div class="frow"><span class="k">Emails trouvés</span><span class="v">${s.email_count || 0} <small>sur ${plural(s.emails, "lead")}${s.emails_link ? `, ${s.emails_link} via sa page choisie` : ""}</small></span></div>
-          <div class="frow"><span class="k">Décisions</span><span class="v">${Arena.num(s.decisions)}</span></div>
+          <div class="frow"><span class="k">Décisions</span><span class="v">${Arena.num(s.decisions)}${s.failed_calls ? ` <small>(${plural(s.failed_calls, "erreur")})</small>` : ""}</span></div>
           <div class="frow"><span class="k">Coût réel</span><span class="v">${Arena.usd(s.cost, s.cost >= 1 ? 3 : 4)}</span></div>
           <div class="frow"><span class="k">À contacter</span><span class="v">${s.oui} <small>(${pct(s.oui_pct)})</small></span></div>
           <div class="frow"><span class="k">Latence médiane d'une décision</span><span class="v">${secs(s.lat_med_ms)}</span></div>
         </div>
       </div>`;
-    const fx = (x) => (x == null ? "–" : "×" + (x >= 10 ? Math.round(x) : x.toFixed(1).replace(".", ",")));
+    const fx = (x) => (x == null || !isFinite(x) ? "–" : "×" + (x >= 10 ? Math.round(x) : x.toFixed(1).replace(".", ",")));
+    const ratio = (a, b, k) => (M[a] && M[b] && M[a][k] && M[b][k] ? M[b][k] / M[a][k] : null);
     const dis = sm.disagreements || [];
-    const vd = (x) => `${x.fit >= 0.5 ? "OUI" : "NON"} ${pct(x.fit)} · ${STAGE_FR[x.stage] || x.stage || "?"}`;
+    const vd = (x) => (x ? `${x.fit >= 0.5 ? "OUI" : "NON"} ${pct(x.fit)} · ${STAGE_FR[x.stage] || x.stage || "?"}` : "–");
     const disHTML = dis.length
-      ? `<div class="items">${dis.slice(0, 8).map((d) => `<div class="it"><span class="h">${esc(maskHost(d.host))}</span><span class="j">Jev ${vd(d.jev)}</span><span class="o">Opus ${vd(d.opus)}</span></div>`).join("")}</div>`
-        + (dis.length > 8 ? `<div class="ffoot">et ${dis.length - 8} autre${dis.length - 8 > 1 ? "s" : ""}</div>` : "")
-      : `<div class="none">Aucun désaccord sur le verdict.</div>`;
+      ? `<div class="items">${dis.slice(0, 6).map((d) => `<div class="it"><span class="h">${esc(maskHost(d.host))}</span><span class="j">Jev ${vd(d.jev)}</span><span class="l">Laya ${vd(d.laya)}</span><span class="o">Opus ${vd(d.opus)}</span></div>`).join("")}</div>`
+        + (dis.length > 6 ? `<div class="ffoot">et ${dis.length - 6} autre${dis.length - 6 > 1 ? "s" : ""}</div>` : "")
+      : `<div class="none">Les trois sont d'accord sur tous les verdicts.</div>`;
+    const a3 = A.all3 || {};
     box.innerHTML = `
-      <div class="fc card">
+      <div class="fc card three-fc">
         <h2>Objectif atteint : ${sm.dispatched} leads qualifiés${sm.exhausted ? " (source épuisée)" : ""}</h2>
-        <div class="lead">Mêmes leads, même lecteur web, mêmes questions, ${S.stats ? S.stats.conc : ""} en parallèle de chaque côté. Coûts réels renvoyés par OpenRouter.</div>
-        <div class="fgrid">
-          ${col("jev", J)}
-          <div class="fmid">
-            <div class="x">${fx(R.time)}<small>plus rapide de bout en bout (web compris)</small></div>
-            <div class="x">${fx(R.cost)}<small>moins cher</small></div>
-            <div class="x agree-big">${pct(A.verdict)}<small>d'accord sur OUI / NON (${A.n} leads)${A.stage != null ? `<br>catégorie ${pct(A.stage)} · même lien ${pct(A.link)}` : ""}</small></div>
-          </div>
-          ${col("opus", O)}
+        <div class="lead">Mêmes leads, même lecteur web, mêmes questions, ${S.stats ? S.stats.conc : ""} en parallèle pour chaque modèle. Coûts réels renvoyés par OpenRouter ; Laya est gratuit (${Arena.MAKERS.laya}).</div>
+        <div class="fgrid">${MODELS.map((m) => col(m, M[m])).join("")}</div>
+        <div class="fx">
+          <div class="x">${fx(ratio("jev", "opus", "time_s"))}<small>Jev plus rapide qu'Opus de bout en bout</small></div>
+          <div class="x">${fx(ratio("laya", "opus", "time_s"))}<small>Laya plus rapide qu'Opus de bout en bout</small></div>
+          <div class="x">${fx(ratio("jev", "opus", "cost"))}<small>Jev moins cher qu'Opus</small></div>
+          <div class="x agree-big">${pct(a3.verdict)}<small>les trois d'accord sur OUI / NON (${a3.n || 0} leads)<br>Jev·Opus ${pct((A["jev-opus"] || {}).verdict)} · Jev·Laya ${pct((A["jev-laya"] || {}).verdict)} · Laya·Opus ${pct((A["laya-opus"] || {}).verdict)}</small></div>
         </div>
-        <div class="fdis"><div class="label">Désaccords sur le verdict (${dis.length})</div>${disHTML}</div>
-        <div class="factions"><button class="btn ghost" data-act="close" type="button">Voir les leads</button><button class="btn violet" data-act="new" type="button">Nouvelle course (R)</button></div>
+        <div class="fdis"><div class="label">Leads où ils ne sont pas d'accord (${dis.length})</div>${disHTML}</div>
+        <div class="factions"><button class="btn ghost" data-act="xls" type="button">Leads en Excel</button><button class="btn ghost" data-act="close" type="button">Voir les leads</button><button class="btn violet" data-act="new" type="button">Nouvelle course (R)</button></div>
         <div class="ffoot">Source : ${Arena.num(sm.pipe.profiles)} profils GitHub lus par Scout, ${Arena.num(sm.pipe.fetch.pages)} pages lues (Lightpanda ${sm.pipe.fetch.lightpanda}, Crawl4AI ${sm.pipe.fetch.crawl4ai}, échecs ${sm.pipe.fetch.fail}). Emails ${S.mask ? "masqués" : "visibles"}, personne n'a été contacté.</div>
       </div>`;
     box.querySelector('[data-act="new"]').onclick = () => newRace();
     box.querySelector('[data-act="close"]').onclick = () => { S.showFinal = false; renderFinal(); };
+    box.querySelector('[data-act="xls"]').onclick = (ev) => LeadsExport.download(ev.currentTarget);
     box.hidden = false;
     requestAnimationFrame(() => requestAnimationFrame(() => box.classList.add("show")));
   }
@@ -406,8 +402,10 @@
   }
 
   function onEvent(e) {
+    LeadsExport.onEvent(e);
     switch (e.type) {
-      case "snapshot": onSnapshot(e.data); break;
+      case "snapshot": Arena.setLaya(e.laya); onSnapshot(e.data); updateXls(); break;
+      case "laya": Arena.setLaya(e.laya); break;
       case "config": renderConfig(e.config); break;
       case "reset":
         blank();
@@ -416,7 +414,7 @@
         break;
       case "race_start":
         blank("Scout cherche les premiers leads…");
-        setPhase("running");
+        setPhase("running"); updateXls();
         S.stats = { ...idleStats(), target: e.target, conc: e.conc }; S.statsAt = performance.now();
         setText($("#conc-txt"), e.conc);
         renderStats();
@@ -427,17 +425,18 @@
         renderStats();
         break;
       case "lead_done":
+        updateXls();
         addRow(e.row.model, e.row, true);
         for (const ne of e.row.new_emails || []) addEmail(e.row.model, { ...ne, host: e.row.host, lead: e.row.lead }, true);
         break;
       case "agree": markAgree(e.lead, e.agree); break;
       case "web": addFeed(e, true); break;
       case "race_end":
-        setPhase("done"); S.summary = e.summary;
+        setPhase("done"); S.summary = e.summary; updateXls();
         setTimeout(() => { S.showFinal = true; renderFinal(); }, 1400);
         break;
       case "race_error":
-        setPhase("error"); banner("Course arrêtée : " + (e.error || "erreur"));
+        setPhase("error"); banner("Course arrêtée : " + (e.error || "erreur")); updateXls();
         break;
       case "error": Arena.toast(e.error || "erreur"); break;
     }
@@ -461,6 +460,16 @@
     ws.send({ cmd: "start", target: S.config.target, conc: S.config.conc });
   }
   function newRace() { ws.send({ cmd: "reset" }); }
+  // bouton « Leads en Excel » : visible des qu'il y a des leads juges et que la course est finie
+  // (ou apres un rechargement, si le serveur garde la derniere course)
+  async function updateXls() {
+    const b = $("#btn-xls");
+    let show = S.phase !== "running" && LeadsExport.hasData();
+    if (!show && S.phase === "idle") show = await LeadsExport.serverHasData();
+    b.hidden = !show;
+  }
+  $("#btn-xls").addEventListener("click", (e) => { e.currentTarget.blur(); LeadsExport.download(e.currentTarget); });
+  $("#sel-laya").addEventListener("change", (e) => { Arena.switchLaya(e.target.value); e.target.blur(); });
   $("#btn-start").addEventListener("click", (e) => { e.currentTarget.blur(); start(); });
   $("#btn-new").addEventListener("click", (e) => { e.currentTarget.blur(); newRace(); });
   document.addEventListener("keydown", (ev) => {
@@ -470,6 +479,7 @@
     else if (ev.key === "m" || ev.key === "M") toggleMask();
     else if (ev.key === "f" || ev.key === "F") { if (S.summary) { S.showFinal = !S.showFinal; renderFinal(); } }
     else if (ev.key === "Escape") { S.showFinal = false; renderFinal(); }
+    else if ((ev.key === "e" || ev.key === "E") && S.phase !== "running") LeadsExport.download($("#btn-xls"));
   });
   function toggleMask() {
     S.mask = !S.mask;

@@ -78,7 +78,7 @@ async def home():
 @app.get("/api/status")
 async def status():
     return {"scenes": {n: sc.title for n, (sc, _) in SCENES.items()}, "errors": SCENE_ERRORS,
-            "ledger": LEDGER_OBJ.summary(), "models": deciders.MODELS}
+            "ledger": LEDGER_OBJ.summary(), "models": deciders.MODELS, "laya": deciders.laya_info()}
 
 
 @app.get("/api/ledger")
@@ -88,11 +88,73 @@ async def ledger():
 
 @app.post("/api/probe")
 async def probe():
-    """Verifie que Jev et Opus repondent (2 vraies decisions, ~0,003 $)."""
+    """Verifie que Jev, Laya et Opus repondent (3 vraies decisions, ~0,003 $)."""
     q = {"up": {"type": "noul", "instructions": "Is `x` greater than 10?"}}
     st = {"x": 12}
-    j, o = await asyncio.gather(deciders.decide("jev", "probe", st, q), deciders.decide("opus", "probe", st, q))
-    return {"jev": j, "opus": o}
+    j, l, o = await asyncio.gather(deciders.decide("jev", "probe", st, q), deciders.decide("laya", "probe", st, q),
+                                   deciders.decide("opus", "probe", st, q))
+    return {"jev": j, "laya": l, "opus": o}
+
+
+# ---------------------------------------------------------------------------------------------- Laya
+async def _laya_check(backend: str) -> dict:
+    """Une vraie decision Laya (gratuite) sur le backend demande, sans changer le backend actif."""
+    r = await deciders.laya_decide("probe", {"x": 12}, {"up": {"type": "choice", "instructions": "Is `x` greater than 10?",
+                                                           "criteria": {"yes": "x is greater than 10", "no": "x is 10 or less"}}},
+                                   backend=backend)
+    return {"ok": r["ok"], "latency_ms": r["latency_ms"], "error": r["error"],
+            "answer": (r["answers"].get("up") or {}).get("choice") if r["ok"] else None}
+
+
+@app.get("/api/laya")
+async def laya_status(check: int = 0):
+    out = deciders.laya_info()
+    if check:
+        loc, hos = await asyncio.gather(_laya_check("local"), _laya_check("hosted"))
+        out["check"] = {"local": loc, "hosted": hos}
+    return out
+
+
+@app.post("/api/laya/compare")
+async def laya_compare(body: dict):
+    """Page /laya : la meme decision envoyee n fois a Laya local, Laya heberge (Hugging Face) et Jev (reference).
+    Chaque cible enchaine ses appels un par un (latence propre) ; les cibles tournent en parallele."""
+    state, questions = body.get("state"), body.get("questions")
+    if not isinstance(questions, dict) or not questions:
+        return JSONResponse({"error": "questions manquantes (un objet JSON au format de Jev)"}, 400)
+    n = max(1, min(30, int(body.get("n") or 1)))
+    targets = [t for t in (body.get("targets") or ["local", "hosted", "jev"]) if t in ("local", "hosted", "jev")]
+
+    async def run(t):
+        out = []
+        for _ in range(n):
+            if t == "jev":
+                r = await deciders.decide("jev", "probe", state, questions)
+            else:
+                r = await deciders.laya_decide("probe", state, questions, backend=t)
+            out.append({"ok": r["ok"], "latency_ms": r["latency_ms"], "cost": r.get("cost") or 0.0,
+                        "error": r["error"], "answers": r["answers"]})
+        return t, out
+
+    try:
+        res = dict(await asyncio.gather(*(run(t) for t in targets)))
+    except deciders.BudgetExceeded as e:
+        return JSONResponse({"error": str(e)}, 402)
+    return {"n": n, "results": res, "laya": deciders.laya_info()}
+
+
+@app.post("/api/laya/backend")
+async def laya_backend(body: dict):
+    busy = [n for n, (sc, _) in SCENES.items() if getattr(sc, "busy", lambda: False)()]
+    if busy:
+        return JSONResponse({"error": f"une course tourne ({', '.join(busy)}) : arrête-la avant de changer Laya"}, 409)
+    try:
+        info = deciders.set_laya_backend(str(body.get("backend")))
+    except ValueError as e:
+        return JSONResponse({"error": str(e)}, 400)
+    for name in SCENES:
+        await HUB.publish(name, {"type": "laya", "laya": info}, record=False)
+    return info
 
 
 @app.websocket("/ws/{scene_name}")
@@ -107,7 +169,7 @@ async def ws_endpoint(ws: WebSocket, scene_name: str):
     HUB.add(scene_name, ws)
     try:
         await ws.send_text(json.dumps({"type": "snapshot", "data": sc.snapshot(),
-                                       "models": deciders.MODELS}, default=str))
+                                       "models": deciders.MODELS, "laya": deciders.laya_info()}, default=str))
         while True:
             raw = await ws.receive_text()
             try:
