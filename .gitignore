@@ -1,12 +1,12 @@
 # secrets et donnees locales
 .env
-data/
-tmp/
+/data/
+/tmp/
 research/data/
 research/*.csv
 research/*.json
 # depots de reference clones (voir vendor/README si besoin)
-vendor/
+/vendor/
 # divers
 __pycache__/
 *.pyc
@@ -17,8 +17,8 @@ Thumbs.db
 # propre a ce PC / developpement
 INSTALLE.md
 ARENA_DEV.md
-ref/
-tools/
+/ref/
+/tools/
 # SF Pro Display : licence Apple, non redistribuable (voir arena/app/static/common/fonts/LISEZMOI.md)
 *.OTF
 *.otf
