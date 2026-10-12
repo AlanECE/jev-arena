@@ -34,9 +34,12 @@ Préréglage « BTC · simulé · 24 h/24 ». Étude sur **10 journées** de bou
   de +0,5 à +0,7 bps sur 1-2 minutes (dizaines de milliers d'événements, très significatif). Fader (comme sur TSLA)
   perd sur 100 % des réglages.
 - **Règle retenue** : étirement des 10 dernières secondes au-delà de **2,0 σ** → position **dans le sens** du
-  mouvement, tenue **60 s**, objectif +8 pb, **stop −2 pb**.
-- **Résultat (écart 0,2 bps, sans frais)** : profil Jev **+585 bps par jour, ~920 trades/jour, +0,60 pb par trade,
-  50 % de gagnants, 10 jours positifs sur 10** (de +156 à +996). Profil Opus (décision toutes les 4 s, 3 s de retard) :
+  mouvement, tenue **60 s**, objectif (take profit) **+5 pb**, **stop −2 pb**. Le take profit et le stop sont vérifiés à
+  chaque seconde sur le prix où la position peut être soldée (offre d'achat pour un long, de vente pour un short).
+- **Résultat (écart 0,2 bps, sans frais)** : profil Jev **+561 bps par jour, ~1 040 trades/jour, 10 jours positifs sur
+  10**. Sorties : 16 % au take profit, 30 % au stop, 54 % à la fin des 60 s (le bitcoin bouge rarement de 5 pb en une
+  minute). Sans take profit le gain est presque le même (+585) mais on ne voit jamais l'objectif atteint ; à +8 pb il ne
+  se déclenche que dans 6 % des cas. Profil Opus (décision toutes les 4 s, 3 s de retard) :
   +187 bps/jour. Avec un écart de 0,5 bps : Jev +308, **Opus devient perdant** (6 % de réglages positifs).
   **L'avantage vit dans les premières secondes après la cassure : c'est la vitesse de décision qui fait la différence.**
 - **Ce que ça veut dire honnêtement** : c'est un backtest avec exécution au meilleur prix affiché, sans frais de

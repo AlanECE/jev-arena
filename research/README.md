@@ -33,7 +33,8 @@ Conclusion honnête (actions) : un petit avantage, fragile d'un jour à l'autre,
 ## BTC/USD (bougies d'1 s Binance BTCUSDT, 02-11/10/2026, `btc_study.py` et `btc_momentum.py`)
 5. **Le bitcoin à la seconde est un marché de momentum** : après |z10| > 2-3, le prix continue de +0,5 à +0,7 pb sur
    1-2 minutes (n = 20 000 à 100 000, erreur type 0,01-0,03). Fader perd sur 100 % des réglages (−90 pb/jour au mieux).
-6. **Règle « Rupture »** : z10 > 2,0 → position dans le sens du mouvement, tenue 60 s, objectif 8 pb, stop 2 pb. Avec
+6. **Règle « Rupture »** : z10 > 2,0 → position dans le sens du mouvement, tenue 60 s, objectif 5 pb, stop 2 pb
+   (avec 8 pb : même résultat à 2 % près, mais l'objectif n'est atteint que dans 6 % des sorties contre 16 %). Avec
    l'écart Coinbase mesuré en direct (0,001 bps médian, 0,17 au p90 ; 0,2 pris) : profil jev **+585 pb/jour, ~920
    trades/jour, +0,60 pb/trade, 50 % gagnants, 10 jours positifs sur 10** ; profil opus +187 pb/jour. À 0,5 bps d'écart :
    jev +308 (88 % de réglages positifs), opus +31 au mieux (6 % positifs). **La vitesse de décision est l'avantage.**

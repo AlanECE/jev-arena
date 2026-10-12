@@ -150,10 +150,10 @@ STRATEGY = Ressort()
 # Validé sur 10 journées (02-11/10/2026, research/btc_momentum.py, écart 0,2 bps) : profil Jev +585 bps/jour,
 # ~920 trades/jour, +0,60 bps par trade, 10 jours positifs sur 10 ; profil Opus (3 s de retard) +187 bps/jour.
 PRESETS_RUPTURE = {
-    "BTCUSD": {"thr": 2.0, "hold": 60, "tp": 8.0, "sl": 2.0, "window": 10},
-    "ETHUSD": {"thr": 2.0, "hold": 60, "tp": 8.0, "sl": 2.0, "window": 10},
+    "BTCUSD": {"thr": 2.0, "hold": 60, "tp": 5.0, "sl": 2.0, "window": 10},
+    "ETHUSD": {"thr": 2.0, "hold": 60, "tp": 5.0, "sl": 2.0, "window": 10},
 }
-DEFAULT_RUPTURE = {"thr": 2.0, "hold": 60, "tp": 8.0, "sl": 2.0, "window": 10}
+DEFAULT_RUPTURE = {"thr": 2.0, "hold": 60, "tp": 5.0, "sl": 2.0, "window": 10}
 
 
 class Rupture(Ressort):
@@ -161,7 +161,7 @@ class Rupture(Ressort):
     label = "Rupture · suivre la cassure (BTC)"
     short = "Rupture · suivi des cassures"
     description = ("Quand le prix casse de plus de 2 σ en 10 s, le modèle suit le mouvement ; "
-                   "sortie après 60 s, objectif +8 pb, stop −2 pb.")
+                   "sortie après 60 s, objectif +5 pb, stop −2 pb.")
     risk = Risk(position_usd=100_000, min_hold_s=0, max_orders_per_min=20)
 
     def params(self, symbol: str) -> dict:

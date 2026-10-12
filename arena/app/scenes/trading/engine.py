@@ -89,7 +89,13 @@ class Fund:
             return 0.0, 0.0
         feed = self.scene.feed
         if feed is not None:
-            mark = feed.xbid if self.qty > 0 else feed.xask
+            if self.scene.simulated:
+                # courtier simule : il execute au meilleur prix du flux affiche (Coinbase), on valorise pareil
+                b = feed.builder
+                mark = b.bid if self.qty > 0 else b.ask
+            else:
+                # Alpaca : prix auquel la position peut vraiment etre soldee chez Alpaca
+                mark = feed.xbid if self.qty > 0 else feed.xask
             if mark:
                 price = mark
         if price is None:
@@ -654,6 +660,9 @@ class TradingScene(SceneBase):
         pend = [f.pending for f in self.funds.values() if f.pending]
         if pend:
             await asyncio.wait(pend, timeout=15)
+        for f in self.funds.values():
+            if f.side != "flat":
+                f.exit_reason = "fin de session"
         msgs = await self.flatten() if flatten else []
         await asyncio.sleep(1.5)   # laisser arriver les executions de fermeture
         price = self.feed.builder.last_price if self.feed else None

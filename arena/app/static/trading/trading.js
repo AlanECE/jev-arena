@@ -203,7 +203,7 @@
     Arena.set(el.querySelector(".s-orders"), s.rejected ? `${Arena.num(s.orders)} (${s.rejected} refusés)` : Arena.num(s.orders));
   }
 
-  const REASONS = { "durée": "durée", objectif: "objectif", stop: "stop" };
+  const REASONS = { "durée": "durée", objectif: "objectif ✓", stop: "stop", "fin de session": "fin" };
   function addTrade(m, tr, animate = true) {
     const list = S.f[m].el.querySelector(".tlist");
     const row = document.createElement("div");

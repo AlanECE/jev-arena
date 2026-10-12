@@ -23,7 +23,7 @@ trading, **H** affiche ou masque les réglages.
 
 ## Trading : ce qu'il faut savoir
 - **Réglage de la vidéo (par défaut)** : « BTC · simulé · 24 h/24 », stratégie **Rupture** (suivre une cassure de
-  2 σ en 10 s, tenue 60 s, stop −2 pb). Validée sur 10 journées de bougies d'1 s : profil Jev +585 bps/jour, positif
+  2 σ en 10 s, tenue 60 s, take profit +5 pb, stop −2 pb). Validée sur 10 journées de bougies d'1 s : profil Jev +585 bps/jour, positif
   10 jours sur 10, contre +187 pour le profil Opus ; avec un écart de 0,5 bps Opus devient perdant. Environ un trade par
   minute pour Jev. Chiffres, méthode et limites honnêtes (sans frais de courtage !) dans
   `arena/app/scenes/trading/LISEZMOI.md`.
